@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     error::Error,
     fmt::Display,
     fs::OpenOptions,
@@ -6,13 +7,21 @@ use std::{
     ops::{Deref, DerefMut},
     str::FromStr,
 };
+
+const VERSION: &str = "0.0.5";
+
 #[derive(Debug)]
 pub struct IError {
     error: String,
 }
 impl IError {
-    pub fn message(error: String) -> Box<Self> {
-        Box::new(Self { error })
+    pub fn message<T>(error: T) -> Box<Self>
+    where
+        T: ToString,
+    {
+        Box::new(Self {
+            error: error.to_string(),
+        })
     }
 }
 impl Display for IError {
@@ -43,16 +52,17 @@ impl Stack {
             Ok(self.vec[self.len() - 1])
         } else {
             Err(IError::message(
-                "trying to access the stack while it is empty".to_owned(),
+                "trying to access the stack while it is empty",
             ))
         }
     }
 }
 pub struct Interpreter {
-    memory: [u8; 131072],
+    memory: [u32; 131072],
     stack: Stack,
     lines: Vec<String>,
     opcode_params: [u8; 14],
+    names: HashMap<String, usize>,
     pos: usize,
     debug: bool,
 }
@@ -70,13 +80,23 @@ impl Interpreter {
             memory: [0; 131072],
             stack: Stack::default(),
             lines,
-            opcode_params: [0, 2, 2, 1, 3, 1, 2, 0, 0, 1, 1, 1, 1, 0],
+            opcode_params: [0, 2, 2, 1, 3, 1, 3, 0, 0, 1, 1, 1, 1, 0],
             pos: 0,
             debug: false,
+            names: HashMap::new(),
         })
     }
     pub fn debug(&mut self, new: bool) {
         self.debug = new;
+    }
+    pub fn remove_comments(string: &str) -> &str {
+        let mut res = string;
+
+        let comments = string.split(";").collect::<Vec<&str>>();
+        if !comments.is_empty() {
+            res = comments[0].trim();
+        }
+        res
     }
     pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
         let mut last_opcode = 0;
@@ -86,10 +106,16 @@ impl Interpreter {
             }
             let pre_string = self.lines[self.pos].to_owned();
             let mut string = pre_string.trim();
-            let comments = string.split(":").collect::<Vec<&str>>();
-            if !comments.is_empty() {
-                string = comments[0];
+
+            string = Self::remove_comments(string);
+
+            // skip aliases
+            if string.contains(':') {
+                self.pos += 1;
+                continue;
             }
+
+            //skip spaces
             let spaces: Vec<&str> = string.split(' ').collect();
             if spaces.is_empty()
                 || (spaces.len() == 1 && spaces[0] != "\n")
@@ -100,19 +126,27 @@ impl Interpreter {
                 }
             }
 
-            if last_opcode == 3 && !string.contains("robson") {
+            // Implements the push abreviation
+            if last_opcode == 3
+                && !string.contains("robson")
+                && !string.contains(":")
+            {
                 self.command(3, string, "", "")?;
                 self.pos += 1;
                 continue;
             }
+
+            //get params and opcodes
             let mut opcode: u8 = 0;
             let mut params: [String; 3] =
                 ["".to_owned(), "".to_owned(), "".to_owned()];
+
             for i in spaces {
                 if i != "robson" {
                     return Err(IError::message(format!(
-                        "invalid token for opcode {}, '{}'",
-                        self.pos, i
+                        "invalid token for opcode in line {}, '{}'",
+                        self.pos + 1,
+                        i
                     )));
                 }
                 opcode += 1;
@@ -120,23 +154,31 @@ impl Interpreter {
 
             let param_count = self.opcode_params[opcode as usize];
             for i in 0..param_count {
-                if self.verify_index_overflow(self.pos + 1) {
+                self.pos += 1;
+                if self.verify_index_overflow(self.pos) {
                     return Err(IError::message(format!(
-                        "missing params in line {}",
+                        "missing params command of line {}",
                         self.pos - i as usize,
                     )));
                 }
-                self.pos += 1;
                 let string = self.lines[self.pos].to_owned();
+                if string.trim().len() < 2 {
+                    return Err(IError::message(format!(
+                        "missing params command of line {}",
+                        self.pos - i as usize,
+                    )));
+                }
                 params[i as usize] = string;
             }
+
+            //update and run command
             self.pos += 1;
             if self.debug {
                 println!("\nopcode {}", opcode);
                 println!("count: {}", param_count);
                 println!("params: {}, {}", params[0], params[1]);
                 println!("string '{}'", string);
-                println!("stack {:?}", self.stack);
+                println!("stack {:?}", self.stack.vec);
             }
             last_opcode = opcode;
             self.command(opcode, &params[0], &params[1], &params[2])?;
@@ -168,9 +210,6 @@ impl Interpreter {
             //PUSH TO STACK SOME VALUE
             3 => {
                 let value = self.get_real_value(param1)?;
-                if self.debug {
-                    println!("stack {:?}", self.stack);
-                }
                 self.stack.push(value);
             }
             //IF TRUE JUMP
@@ -193,19 +232,25 @@ impl Interpreter {
             6 => {
                 let mut value = self.get_real_value::<u32>(param1)?;
                 let r#type = self.get_real_value::<u32>(param2)?;
+                let limit = self.get_real_value::<u32>(param3)?;
                 let mut buff = String::new();
                 std::io::stdout().flush()?;
                 std::io::stdin().read_line(&mut buff)?;
                 match r#type {
                     1 => {
                         self.memory[value as usize] =
-                            buff.trim().parse::<u8>()?
+                            buff.trim().parse::<u32>()?
                     }
                     _ => {
-                        for i in buff.chars() {
-                            let i = i as u8;
-                            self.memory[value as usize] = i;
-                            value += 1;
+                        for (i, char) in buff.chars().enumerate() {
+                            if i < limit as usize {
+                                let char =
+                                    if char == '\n' { '\0' } else { char };
+                                self.memory[value as usize] = char as u32;
+                                value += 1;
+                            } else {
+                                break;
+                            }
                         }
                         self.memory[value as usize] = 0;
                     }
@@ -247,7 +292,7 @@ impl Interpreter {
                 let address = self.get_real_value::<u32>(param1)? as usize;
                 let value = self.stack.top()?;
                 self.stack.pop();
-                self.memory[address] = value as u8;
+                self.memory[address] = value as u32;
             }
             //POP STACK
             11 => {
@@ -259,7 +304,7 @@ impl Interpreter {
             //GET ALL THE STRING BUFFER
             12 => {
                 let mut value = self.get_real_value::<u32>(param1)?;
-                let mut buffer: Vec<u8> = Vec::new();
+                let mut buffer: Vec<u32> = Vec::new();
 
                 loop {
                     let temp = self.memory[value as usize];
@@ -281,9 +326,34 @@ impl Interpreter {
         }
         Ok(())
     }
+    fn start_alias(&mut self) -> Option<Box<IError>> {
+        for (pos, i) in self.lines.iter().enumerate() {
+            if i.contains(':') {
+                let mut string = i.to_owned();
+
+                string = Self::remove_comments(&string).to_owned();
+
+                //add alias if it is an alias
+                if string.trim().chars().last() == Some(':') {
+                    let value = string.trim().replace(":", "");
+                    if self.names.get(&value).is_some() {
+                        return Some(IError::message(format!(
+                            "duplicate alias: {}",
+                            value
+                        )));
+                    }
+                    if self.debug {
+                        println!("{}: {}", value, pos + 1);
+                    }
+                    self.names.insert(value, pos + 2);
+                }
+            }
+        }
+        None
+    }
     fn get_real_value<T>(
         &self,
-        parameter: &str,
+        mut parameter: &str,
     ) -> Result<T, Box<dyn Error>>
     where
         T: 'static,
@@ -291,6 +361,8 @@ impl Interpreter {
         T: From<u32>,
         <T as FromStr>::Err: std::error::Error,
     {
+        parameter = Self::remove_comments(parameter);
+
         let splited: Vec<&str> = parameter.split(' ').collect();
 
         if splited.len() < 2 {
@@ -314,16 +386,36 @@ impl Interpreter {
             }
             "chupou" => {
                 let value = splited[1].parse::<usize>()?;
-                let a = self.stack[self.stack.len() - 1 + value];
+                let position = 1 + value;
+                if self.stack.len() < position {
+                    return Err(IError::message("out of the stack"));
+                }
+                let a = self.stack[self.stack.len() - position];
                 Ok(a.into())
             }
             "fudeu" => {
                 let value = splited[1].parse::<usize>()?;
                 Ok((self.memory[value] as u32).into())
             }
+            "lambeu" => {
+                let value = splited[1].trim();
+                if value.chars().collect::<Vec<char>>()[0] != ':' {
+                    return Err(IError::message(format!(
+                        "malformated name in command at {}, '{}'",
+                        self.pos, value
+                    )));
+                }
+                let value = value.replace(':', "");
+
+                let a = self.names.get(&value).ok_or(IError::message(
+                    format!("cant find {}", value),
+                ))?;
+
+                Ok((*a as u32).into())
+            }
             token => {
                 return Err(IError::message(format!(
-                    "unexpected token at line {}, '{}'",
+                    "unexpected token in command of line {}, '{}'",
                     self.pos, token
                 )))
             }
@@ -335,59 +427,83 @@ impl Interpreter {
     }
 }
 
+fn run(
+    file_path: String,
+    debug: bool,
+    lines: usize,
+) -> Result<(), Box<dyn Error>> {
+    if file_path.is_empty() {
+        return Err(IError::message(
+            "file was not specified, please specify an .robson file",
+        ));
+    }
+    if !file_path.contains(".robson") {
+        return Err(IError::message("please specify a .robson file"));
+    }
+    let mut interpreter = Interpreter::new(&file_path)?;
+    interpreter.debug(debug);
+    match interpreter.start_alias() {
+        Some(err) => return Err(err),
+        None => {}
+    };
+    interpreter.start()?;
+
+    if interpreter.debug {
+        print!("[");
+        for i in 0..lines {
+            print!("{}, ", interpreter.memory[i]);
+        }
+        print!("]\n");
+    }
+    Ok(())
+}
+
 fn main() {
     let args = &std::env::args().collect::<Vec<String>>();
     let mut file_path = String::new();
     let mut debug = false;
+    let mut lines = 0;
     for (i, string) in args.iter().enumerate() {
         match i {
             1 => {
+                if string == "--version" {
+                    println!("Robson v{}", VERSION);
+                    return;
+                }
                 file_path = string.to_owned();
             }
             2 => {
                 if string.to_lowercase() != "debug" {
-                    println!("invalid flag, flags are: ");
-                    println!("debug")
+                    println!("\x1b[93m!invalid flag, flags are: !\x1b[0m");
+                    println!("debug");
                 } else {
                     debug = true
+                }
+            }
+            3 => {
+                if !debug {
+                    println!("\x1b[93m!invalid argument!\x1b[0m");
+                    println!("{}", string);
+                } else {
+                    lines = match string.parse::<usize>() {
+                        Ok(a) => a,
+                        Err(_) => {
+                            println!(
+                                "\x1b[93m!couldnt parse {} into integer!\x1b[0m",
+                                string
+                            );
+                            0
+                        }
+                    };
                 }
             }
             _ => {}
         }
     }
-    if file_path.is_empty() {
-        println!("--------------------\nfile was not specified, please specify an .robson file\n--------------------");
-        return;
-    }
-    if !file_path.contains(".robson") {
-        println!("--------------------\nplease specify a .robson file\n--------------------");
-        return;
-    }
-    let mut interpreter = match Interpreter::new(&file_path) {
-        Ok(a) => a,
-        Err(err) => {
-            println!(
-                "--------------------\n{:?}\n--------------------",
-                err
-            );
-            return;
-        }
-    };
-    interpreter.debug(debug);
-    match interpreter.start() {
-        Ok(_) => {}
-        Err(err) => {
-            println!(
-                "\n--------------------\n{:?}\n--------------------",
-                err
-            )
-        }
-    };
-    if interpreter.debug {
-        print!("[");
-        for i in 0..100 {
-            print!("{}, ", interpreter.memory[i]);
-        }
-        print!("]\n");
+    if let Err(err) = run(file_path, debug, lines) {
+        println!(
+            "\x1b[91m\n--------------------\n{:?}\n--------------------\x1b[0m",
+            err
+        )
     }
 }

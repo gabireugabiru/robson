@@ -1,0 +1,37 @@
+robson robson robson robson robson robson robson robson robson
+lambeu :start
+
+teste:
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson
+comeu 25
+robson robson robson robson robson robson robson robson robson robson
+comeu 26
+joao:
+robson
+fudeu 25
+comeu 1
+robson robson robson robson robson robson robson robson robson robson
+comeu 25
+robson robson robson
+comeu 65
+robson robson robson robson robson robson robson
+robson robson robson robson
+fudeu 25
+fudeu 26
+comeu +3
+robson robson robson robson robson robson robson robson robson
+lambeu :joao
+robson robson robson robson robson robson robson robson robson
+chupou 0
+
+start: 
+robson robson robson
+comeu +4
+comeu 5
+robson robson robson robson robson robson robson robson robson
+lambeu :teste
+robson robson robson
+comeu 10
+robson robson robson robson robson robson robson
