@@ -42,3 +42,23 @@ fn input() {
   .unwrap();
   interpreter.start().unwrap()
 }
+#[test]
+fn operations() {
+  let mut interpreter = Interpreter::new(
+    "tests/operations.robson",
+    200,
+    Infra::new(None),
+  )
+  .unwrap();
+  assert_eq!(interpreter.start_alias().is_none(), true);
+  interpreter.start().unwrap();
+}
+
+#[test]
+fn types() {
+  let mut interpreter =
+    Interpreter::new("tests/types.robson", 200, Infra::new(None))
+      .unwrap();
+  assert_eq!(interpreter.start_alias().is_none(), true);
+  interpreter.start().unwrap();
+}

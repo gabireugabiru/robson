@@ -1,6 +1,4 @@
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod infra {
   pub struct Infra {
     value: Option<String>,
@@ -44,6 +42,9 @@ mod infra {
     }
   }
 }
+#[cfg(test)]
+mod tests;
+mod utils;
 use std::{
   collections::HashMap,
   error::Error,
@@ -51,7 +52,6 @@ use std::{
   fs::OpenOptions,
   io::{stdout, BufRead, BufReader, Write},
   ops::{Deref, DerefMut},
-  str::FromStr,
 };
 
 use crossterm::{
@@ -59,6 +59,9 @@ use crossterm::{
   style::{Color, Print, ResetColor, SetForegroundColor},
 };
 use infra::Infra;
+use utils::{
+  approx_equal, f32_add, f32_sub, i32_add, i32_sub, u32_add, u32_sub,
+};
 
 const VERSION: &str = "0.0.6";
 
@@ -82,13 +85,60 @@ impl Display for IError {
   }
 }
 impl Error for IError {}
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct TypedByte {
+  value: [u8; 4],
+  r#type: Type,
+}
+impl From<u32> for TypedByte {
+  fn from(value: u32) -> Self {
+    Self {
+      value: value.to_be_bytes(),
+      r#type: Type::Usigned,
+    }
+  }
+}
+impl From<i32> for TypedByte {
+  fn from(value: i32) -> Self {
+    Self {
+      value: value.to_be_bytes(),
+      r#type: Type::Signed,
+    }
+  }
+}
+impl From<f32> for TypedByte {
+  fn from(value: f32) -> Self {
+    Self {
+      value: value.to_be_bytes(),
+      r#type: Type::Floating,
+    }
+  }
+}
+impl Deref for TypedByte {
+  type Target = [u8; 4];
+  fn deref(&self) -> &Self::Target {
+    &self.value
+  }
+}
+impl TypedByte {
+  pub fn force_u32(&self, pos: usize) -> Result<u32, Box<dyn Error>> {
+    if self.r#type != Type::Usigned {
+      return Err(IError::message(format!(
+        "Invalid number type at {}",
+        pos
+      )));
+    } else {
+      Ok(u32::from_be_bytes(self.value))
+    }
+  }
+}
 
 #[derive(Default, Debug)]
 pub struct Stack {
-  vec: Vec<u32>,
+  vec: Vec<TypedByte>,
 }
 impl Deref for Stack {
-  type Target = Vec<u32>;
+  type Target = Vec<TypedByte>;
   fn deref(&self) -> &Self::Target {
     &self.vec
   }
@@ -99,7 +149,7 @@ impl DerefMut for Stack {
   }
 }
 impl Stack {
-  pub fn top(&self) -> Result<u32, Box<dyn Error>> {
+  pub fn top(&self) -> Result<TypedByte, Box<dyn Error>> {
     if !self.vec.is_empty() {
       Ok(self.vec[self.len() - 1])
     } else {
@@ -109,8 +159,19 @@ impl Stack {
     }
   }
 }
+#[derive(Clone, Copy, PartialEq, Debug, Eq, PartialOrd)]
+pub enum Type {
+  Usigned,
+  Signed,
+  Floating,
+}
+impl Default for Type {
+  fn default() -> Self {
+    Self::Usigned
+  }
+}
 pub struct Interpreter {
-  memory: Vec<u32>,
+  memory: Vec<TypedByte>,
   stack: Stack,
   lines: Vec<String>,
   opcode_params: [u8; 14],
@@ -118,6 +179,7 @@ pub struct Interpreter {
   pos: usize,
   debug: bool,
   infra: Infra,
+  last_opcode: u8,
 }
 
 impl Interpreter {
@@ -134,7 +196,13 @@ impl Interpreter {
       .flat_map(|a| a.ok())
       .collect::<Vec<String>>();
     Ok(Self {
-      memory: vec![0; limit],
+      memory: vec![
+        TypedByte {
+          value: [0; 4],
+          r#type: Type::Usigned
+        };
+        limit
+      ],
       stack: Stack::default(),
       lines,
       opcode_params: [0, 2, 2, 1, 3, 1, 3, 0, 0, 1, 1, 1, 1, 0],
@@ -142,6 +210,7 @@ impl Interpreter {
       debug: false,
       names: HashMap::new(),
       infra,
+      last_opcode: 0,
     })
   }
   pub fn debug(&mut self, new: bool) {
@@ -157,7 +226,7 @@ impl Interpreter {
     res
   }
   pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
-    let mut last_opcode = 0;
+    // let mut last_opcode = 0;
     loop {
       if self.verify_index_overflow(self.pos) {
         break;
@@ -173,18 +242,14 @@ impl Interpreter {
         continue;
       }
 
-      //skip spaces
-      let spaces: Vec<&str> = string.split(' ').collect();
-      if spaces.is_empty() || (spaces.len() == 1 && spaces[0] != "\n")
-      {
-        if string != "robson" {
-          self.pos += 1;
-          continue;
-        }
+      // //skip spaces
+      if string.trim().is_empty() {
+        self.pos += 1;
+        continue;
       }
 
       // Implements the push abreviation
-      if last_opcode == 3
+      if self.last_opcode == 3
         && !string.contains("robson")
         && !string.contains(":")
       {
@@ -197,6 +262,8 @@ impl Interpreter {
       let mut opcode: u8 = 0;
       let mut params: [String; 3] =
         ["".to_owned(), "".to_owned(), "".to_owned()];
+
+      let spaces: Vec<&str> = string.split(' ').collect();
 
       for i in spaces {
         if i != "robson" {
@@ -231,14 +298,23 @@ impl Interpreter {
       //update and run command
       self.pos += 1;
       if self.debug {
-        println!("\nopcode {}", opcode);
+        println!("\npos: {}", self.pos);
+        println!("opcode: {}", opcode);
         println!("count: {}", param_count);
-        println!("params: {}, {}", params[0], params[1]);
+        println!(
+          "params: {}, {}, {}",
+          params[0], params[1], params[2]
+        );
         println!("string '{}'", string);
         println!("stack {:?}", self.stack.vec);
       }
-      last_opcode = opcode;
-      self.command(opcode, &params[0], &params[1], &params[2])?;
+      self.last_opcode = opcode;
+      self.command(
+        opcode,
+        Self::remove_comments(&params[0]),
+        Self::remove_comments(&params[1]),
+        Self::remove_comments(&params[2]),
+      )?;
     }
     Ok(())
   }
@@ -252,16 +328,51 @@ impl Interpreter {
     match opcode {
       //ADD TO TWO VALUES
       1 => {
-        let value: u32 = self.get_real_value(param1)?;
-        let value2: u32 = self.get_real_value(param2)?;
-        self.stack.push(value + value2);
+        let value = self.get_real_value(param1)?;
+        let value2 = self.get_real_value(param2)?;
+        if value.r#type != value2.r#type {
+          return Err(IError::message(format!(
+            "Adding with incompatible types {}",
+            self.pos
+          )));
+        }
+
+        match value.r#type {
+          Type::Usigned => {
+            self.stack.push(u32_add(*value, *value2).into())
+          }
+          Type::Signed => {
+            self.stack.push(i32_add(*value, *value2).into())
+          }
+          Type::Floating => {
+            self.stack.push(f32_add(*value, *value2).into())
+          }
+        }
       }
 
       //SUBTRACT TWO VALUES
       2 => {
-        let value: u32 = self.get_real_value(param1)?;
-        let value2: u32 = self.get_real_value(param2)?;
-        self.stack.push(value - value2);
+        let value = self.get_real_value(param1)?;
+        let value2 = self.get_real_value(param2)?;
+
+        if value.r#type != value2.r#type {
+          return Err(IError::message(format!(
+            "Adding with incompatible types {}",
+            self.pos
+          )));
+        }
+
+        match value.r#type {
+          Type::Signed => {
+            self.stack.push(i32_sub(*value, *value2).into())
+          }
+          Type::Usigned => {
+            self.stack.push(u32_sub(*value, *value2).into())
+          }
+          Type::Floating => {
+            self.stack.push(f32_sub(*value, *value2).into())
+          }
+        }
       }
 
       //PUSH TO STACK SOME VALUE
@@ -271,43 +382,61 @@ impl Interpreter {
       }
       //IF TRUE JUMP
       4 => {
-        let value: u32 = self.get_real_value(param1)?;
-        let value2: u32 = self.get_real_value(param2)?;
-        let pos: u32 = self.get_real_value(param3)?;
-        if value == value2 {
+        let value = self.get_real_value(param1)?;
+        let value2 = self.get_real_value(param2)?;
+        let pos = self.get_real_value(param3)?.force_u32(self.pos)?;
+
+        if value.r#type == Type::Floating {
+          let value = f32::from_be_bytes(*value);
+          let value2 = f32::from_be_bytes(*value2);
+          if approx_equal(value, value2, 4) {
+            self.pos = (pos - 1) as usize;
+          }
+        } else {
           self.pos = (pos - 1) as usize;
         }
       }
       //VERIFY THE STACK IF IS EMPTY JUMP
       5 => {
-        let value: u32 = self.get_real_value(param1)?;
+        let value = self.get_real_value(param1)?;
+        if value.r#type != Type::Usigned {
+          return Err(IError::message(format!(
+            "Invalid number type at {}",
+            self.pos
+          )));
+        }
         if self.stack.is_empty() {
-          self.pos = (value - 1) as usize;
+          self.pos = (u32::from_be_bytes(*value) - 1) as usize;
         }
       }
       //GET INPUT AND SET TO A ADDRESS
       6 => {
-        let mut value = self.get_real_value::<u32>(param1)?;
-        let r#type = self.get_real_value::<u32>(param2)?;
-        let limit = self.get_real_value::<u32>(param3)?;
+        let mut value =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
+        let kind =
+          self.get_real_value(param2)?.force_u32(self.pos)?;
+        let limit =
+          self.get_real_value(param3)?.force_u32(self.pos)?;
+
         std::io::stdout().flush()?;
         let buff = self.infra.read_line()?;
-        match r#type {
+
+        match kind {
           1 => {
             self.memory[value as usize] =
-              buff.trim().parse::<u32>()?
+              buff.trim().parse::<u32>()?.into()
           }
           _ => {
             for (i, char) in buff.chars().enumerate() {
               if i < limit as usize {
                 let char = if char == '\n' { '\0' } else { char };
-                self.memory[value as usize] = char as u32;
+                self.memory[value as usize] = (char as u32).into();
                 value += 1;
               } else {
                 break;
               }
             }
-            self.memory[value as usize] = 0;
+            self.memory[value as usize] = 0u32.into();
           }
         }
       }
@@ -320,7 +449,13 @@ impl Interpreter {
             self.pos
           )));
         }
-        print!("{}", (self.stack.top()? as u8) as char);
+        let stack_byte = self.stack.top()?;
+        if stack_byte.r#type != Type::Usigned {
+          return Err(IError::message(
+            "Invalid number type for ASCII",
+          ));
+        }
+        print!("{}", (u32::from_be_bytes(*stack_byte) as u8) as char);
         self.stack.pop();
       }
 
@@ -332,22 +467,38 @@ impl Interpreter {
             self.pos
           )));
         }
-        print!("{}", self.stack.top()?);
+        let TypedByte { value, r#type } = self.stack.top()?;
+
+        match r#type {
+          Type::Floating => print!("{}", f32::from_be_bytes(value)),
+          Type::Signed => print!("{}", i32::from_be_bytes(value)),
+          Type::Usigned => print!("{}", u32::from_be_bytes(value)),
+        }
+
         self.stack.pop();
       }
 
       //JUMP
       9 => {
-        let value = self.get_real_value::<u32>(param1)?;
+        let value =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
         self.pos = (value - 1) as usize;
       }
 
       //SET TO MEMEORY
       10 => {
-        let address = self.get_real_value::<u32>(param1)? as usize;
-        let value = self.stack.top()?;
+        let address =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
+        let typed_byte = self.stack.top()?;
+        if typed_byte.r#type != Type::Usigned {
+          return Err(IError::message(format!(
+            "Invalid number type for memory address at {}",
+            self.pos
+          )));
+        }
+
         self.stack.pop();
-        self.memory[address] = value as u32;
+        self.memory[address as usize] = typed_byte;
       }
       //POP STACK
       11 => {
@@ -358,11 +509,12 @@ impl Interpreter {
 
       //GET ALL THE STRING BUFFER
       12 => {
-        let mut value = self.get_real_value::<u32>(param1)?;
+        let mut value =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
         let mut buffer: Vec<u32> = Vec::new();
 
         loop {
-          let temp = self.memory[value as usize];
+          let temp = u32::from_be_bytes(*self.memory[value as usize]);
           if temp != 0 {
             buffer.push(temp);
             value += 1;
@@ -372,7 +524,10 @@ impl Interpreter {
         }
         buffer.reverse();
         for i in buffer {
-          self.stack.push(i as u32);
+          self.stack.push(TypedByte {
+            value: i.to_be_bytes(),
+            r#type: Type::Usigned,
+          });
         }
       }
       _ => {
@@ -381,6 +536,30 @@ impl Interpreter {
     }
     Ok(())
   }
+  // fn get_param_type(
+  //   &self,
+  //   param: &str,
+  // ) -> Result<Type, Box<dyn Error>> {
+  //   let mut r#type = Type::Usigned;
+  //   let splited: Vec<&str> = param.split(' ').collect();
+  //   match splited[0] {
+  //     "comeu" => {
+  //       if param.contains('f') {
+  //         r#type = Type::Floating;
+  //       }
+  //       if param.contains('i') {
+  //         r#type = Type::Signed;
+  //       }
+  //     }
+  //     "fudeu" => {
+  //       let address = splited[1].trim().parse::<u32>()?;
+  //       r#type = self.memory[address as usize].r#type;
+  //     }
+  //     "chupou" => {}
+  //     _ => {}
+  //   }
+  //   Ok(r#type)
+  // }
   fn start_alias(&mut self) -> Option<Box<IError>> {
     for (pos, i) in self.lines.iter().enumerate() {
       if i.contains(':') {
@@ -406,18 +585,10 @@ impl Interpreter {
     }
     None
   }
-  fn get_real_value<T>(
+  fn get_real_value(
     &self,
-    mut parameter: &str,
-  ) -> Result<T, Box<dyn Error>>
-  where
-    T: 'static,
-    T: FromStr,
-    T: From<u32>,
-    <T as FromStr>::Err: std::error::Error,
-  {
-    parameter = Self::remove_comments(parameter);
-
+    parameter: &str,
+  ) -> Result<TypedByte, Box<dyn Error>> {
     let splited: Vec<&str> = parameter.split(' ').collect();
 
     if splited.len() < 2 {
@@ -428,16 +599,19 @@ impl Interpreter {
     }
     match splited[0] {
       "comeu" => {
-        let mut parse = splited[1].parse::<i32>()?;
-        if parse < 0 {
-          parse = -parse;
-          parse = self.pos as i32 - parse;
+        let mut value = splited[1].trim().to_owned();
+        let first = value.chars().collect::<Vec<char>>()[0];
+        match first {
+          'f' => {
+            value = value.replace("f", "");
+            Ok(value.parse::<f32>()?.into())
+          }
+          'i' => {
+            value = value.replace('i', "");
+            Ok(value.parse::<i32>()?.into())
+          }
+          _ => Ok(splited[1].trim().parse::<u32>()?.into()),
         }
-        if splited[1].contains('+') {
-          parse = self.pos as i32 + parse;
-        }
-        let a: T = (parse as u32).into();
-        Ok(a)
       }
       "chupou" => {
         let value = splited[1].parse::<usize>()?;
@@ -446,11 +620,11 @@ impl Interpreter {
           return Err(IError::message("out of the stack"));
         }
         let a = self.stack[self.stack.len() - position];
-        Ok(a.into())
+        Ok(a)
       }
       "fudeu" => {
         let value = splited[1].parse::<usize>()?;
-        Ok((self.memory[value] as u32).into())
+        Ok(self.memory[value])
       }
       "lambeu" => {
         let value = splited[1].trim();
@@ -508,7 +682,7 @@ fn run(
   if interpreter.debug {
     print!("[");
     for i in 0..lines {
-      print!("{}, ", interpreter.memory[i]);
+      print!("{:?}, ", interpreter.memory[i]);
     }
     print!("]\n");
   }

@@ -34,12 +34,7 @@ comeu 101
 comeu 72
 
 robson robson robson ; Push
-comeu +3
-robson robson robson robson robson robson robson robson robson ; Jump
-lambeu :print_stack_string 
-
-robson robson robson ; Push
-comeu +3
+comeu 40
 robson robson robson robson robson robson robson robson robson ; Jump
 lambeu :print_stack_string 
 
