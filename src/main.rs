@@ -63,7 +63,7 @@ use utils::{
   approx_equal, f32_add, f32_sub, i32_add, i32_sub, u32_add, u32_sub,
 };
 
-const VERSION: &str = "0.0.6";
+const VERSION: &str = "0.0.7";
 
 #[derive(Debug)]
 pub struct IError {
@@ -398,15 +398,10 @@ impl Interpreter {
       }
       //VERIFY THE STACK IF IS EMPTY JUMP
       5 => {
-        let value = self.get_real_value(param1)?;
-        if value.r#type != Type::Usigned {
-          return Err(IError::message(format!(
-            "Invalid number type at {}",
-            self.pos
-          )));
-        }
+        let value =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
         if self.stack.is_empty() {
-          self.pos = (u32::from_be_bytes(*value) - 1) as usize;
+          self.pos = (value - 1) as usize;
         }
       }
       //GET INPUT AND SET TO A ADDRESS
@@ -490,12 +485,6 @@ impl Interpreter {
         let address =
           self.get_real_value(param1)?.force_u32(self.pos)?;
         let typed_byte = self.stack.top()?;
-        if typed_byte.r#type != Type::Usigned {
-          return Err(IError::message(format!(
-            "Invalid number type for memory address at {}",
-            self.pos
-          )));
-        }
 
         self.stack.pop();
         self.memory[address as usize] = typed_byte;
@@ -536,30 +525,6 @@ impl Interpreter {
     }
     Ok(())
   }
-  // fn get_param_type(
-  //   &self,
-  //   param: &str,
-  // ) -> Result<Type, Box<dyn Error>> {
-  //   let mut r#type = Type::Usigned;
-  //   let splited: Vec<&str> = param.split(' ').collect();
-  //   match splited[0] {
-  //     "comeu" => {
-  //       if param.contains('f') {
-  //         r#type = Type::Floating;
-  //       }
-  //       if param.contains('i') {
-  //         r#type = Type::Signed;
-  //       }
-  //     }
-  //     "fudeu" => {
-  //       let address = splited[1].trim().parse::<u32>()?;
-  //       r#type = self.memory[address as usize].r#type;
-  //     }
-  //     "chupou" => {}
-  //     _ => {}
-  //   }
-  //   Ok(r#type)
-  // }
   fn start_alias(&mut self) -> Option<Box<IError>> {
     for (pos, i) in self.lines.iter().enumerate() {
       if i.contains(':') {
