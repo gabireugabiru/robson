@@ -1,47 +1,43 @@
-#[cfg(test)]
 mod infra {
+  #[cfg(test)]
   pub struct Infra {
-    value: Option<String>,
+    value: String,
   }
+  #[cfg(not(test))]
+  pub struct Infra {}
+
   impl Infra {
-    pub fn new(value: Option<String>) -> Self {
+    #[cfg(not(test))]
+    pub fn new() -> Self {
+      Self {}
+    }
+    #[cfg(test)]
+    pub fn new(value: String) -> Self {
       Self { value }
     }
+    #[cfg(test)]
     pub fn read_line(&self) -> Result<String, std::io::Error> {
-      self
-        .value
-        .as_ref()
-        .ok_or(std::io::Error::new(
-          std::io::ErrorKind::InvalidData,
-          "invalid data",
-        ))
-        .cloned()
+      Ok(self.value.clone())
     }
-  }
-}
-#[cfg(not(test))]
-mod infra {
-  use std::io::stdin;
-  pub struct Infra {
-    value: Option<String>,
-  }
-  impl Infra {
-    pub fn new(value: Option<String>) -> Self {
-      Self { value }
-    }
+    #[cfg(not(test))]
     pub fn read_line(&self) -> Result<String, std::io::Error> {
-      if self.value.is_some() {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::InvalidData,
-          "invalid data",
-        ));
-      }
+      use std::io::stdin;
+
       let mut buff = String::new();
+
       stdin().read_line(&mut buff)?;
+
       Ok(buff)
     }
+    pub fn println(&self, to_print: String) {
+      println!("{}", to_print);
+    }
+    pub fn print(&self, to_print: String) {
+      print!("{}", to_print);
+    }
   }
 }
+
 #[cfg(test)]
 mod tests;
 mod utils;
@@ -50,20 +46,15 @@ use std::{
   error::Error,
   fmt::Display,
   fs::OpenOptions,
-  io::{stdout, BufRead, BufReader, Write},
+  io::{BufRead, BufReader, Write},
   ops::{Deref, DerefMut},
 };
 
-use crossterm::{
-  execute,
-  style::{Color, Print, ResetColor, SetForegroundColor},
-};
 use infra::Infra;
 use utils::{
-  approx_equal, f32_add, f32_sub, i32_add, i32_sub, u32_add, u32_sub,
+  approx_equal, f32_add, f32_div, f32_mul, f32_sub, i32_add, i32_div,
+  i32_mul, i32_sub, u32_add, u32_div, u32_mul, u32_sub,
 };
-
-const VERSION: &str = "0.0.7";
 
 #[derive(Debug)]
 pub struct IError {
@@ -205,12 +196,14 @@ impl Interpreter {
       ],
       stack: Stack::default(),
       lines,
-      opcode_params: [0, 2, 2, 1, 3, 1, 3, 0, 0, 1, 1, 1, 1, 0],
+      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 1, 1, 0],
       pos: 0,
       debug: false,
       names: HashMap::new(),
       infra,
       last_opcode: 0,
+      #[cfg(target_arch = "wasm32")]
+      used_input: i64,
     })
   }
   pub fn debug(&mut self, new: bool) {
@@ -225,98 +218,106 @@ impl Interpreter {
     }
     res
   }
-  pub fn start(&mut self) -> Result<(), Box<dyn Error>> {
-    // let mut last_opcode = 0;
-    loop {
-      if self.verify_index_overflow(self.pos) {
-        break;
-      }
-      let pre_string = self.lines[self.pos].to_owned();
-      let mut string = pre_string.trim();
 
-      string = Self::remove_comments(string);
-
-      // skip aliases
-      if string.contains(':') {
-        self.pos += 1;
-        continue;
-      }
-
-      // //skip spaces
-      if string.trim().is_empty() {
-        self.pos += 1;
-        continue;
-      }
-
-      // Implements the push abreviation
-      if self.last_opcode == 3
-        && !string.contains("robson")
-        && !string.contains(":")
-      {
-        self.command(3, string, "", "")?;
-        self.pos += 1;
-        continue;
-      }
-
-      //get params and opcodes
-      let mut opcode: u8 = 0;
-      let mut params: [String; 3] =
-        ["".to_owned(), "".to_owned(), "".to_owned()];
-
-      let spaces: Vec<&str> = string.split(' ').collect();
-
-      for i in spaces {
-        if i != "robson" {
-          return Err(IError::message(format!(
-            "invalid token for opcode in line {}, '{}'",
-            self.pos + 1,
-            i
-          )));
-        }
-        opcode += 1;
-      }
-
-      let param_count = self.opcode_params[opcode as usize];
-      for i in 0..param_count {
-        self.pos += 1;
-        if self.verify_index_overflow(self.pos) {
-          return Err(IError::message(format!(
-            "missing params command of line {}",
-            self.pos - i as usize,
-          )));
-        }
-        let string = self.lines[self.pos].to_owned();
-        if string.trim().len() < 2 {
-          return Err(IError::message(format!(
-            "missing params command of line {}",
-            self.pos - i as usize,
-          )));
-        }
-        params[i as usize] = string;
-      }
-
-      //update and run command
-      self.pos += 1;
-      if self.debug {
-        println!("\npos: {}", self.pos);
-        println!("opcode: {}", opcode);
-        println!("count: {}", param_count);
-        println!(
-          "params: {}, {}, {}",
-          params[0], params[1], params[2]
-        );
-        println!("string '{}'", string);
-        println!("stack {:?}", self.stack.vec);
-      }
-      self.last_opcode = opcode;
-      self.command(
-        opcode,
-        Self::remove_comments(&params[0]),
-        Self::remove_comments(&params[1]),
-        Self::remove_comments(&params[2]),
-      )?;
+  pub fn execute_line(
+    &mut self,
+  ) -> Result<Option<()>, Box<dyn Error>> {
+    if self.verify_index_overflow(self.pos) {
+      return Ok(Some(()));
     }
-    Ok(())
+    let pre_string = self.lines[self.pos].to_owned();
+    let mut string = pre_string.trim();
+
+    string = Self::remove_comments(string);
+
+    // skip aliases
+    if string.contains(':') {
+      self.pos += 1;
+      return Ok(None);
+    }
+
+    // //skip spaces
+    if string.trim().is_empty() {
+      self.pos += 1;
+      return Ok(None);
+    }
+
+    // Implements the push abreviation
+    if self.last_opcode == 3
+      && !string.contains("robson")
+      && !string.contains(":")
+    {
+      self.command(3, string, "", "")?;
+      self.pos += 1;
+      return Ok(None);
+    }
+
+    //get params and opcodes
+    let mut opcode: u8 = 0;
+    let mut params: [String; 3] =
+      ["".to_owned(), "".to_owned(), "".to_owned()];
+
+    let spaces: Vec<&str> = string.split(' ').collect();
+
+    for i in spaces {
+      if i != "robson" {
+        return Err(IError::message(format!(
+          "invalid token for opcode in line {}, '{}'",
+          self.pos + 1,
+          i
+        )));
+      }
+      opcode += 1;
+    }
+    #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
+    if opcode == 6 {
+      if self.used_input != self.pos as i64 {
+        self.last_opcode = 6;
+        self.used_input = self.pos as i64;
+        return Ok(());
+      }
+    }
+
+    let param_count = self.opcode_params[opcode as usize];
+    for i in 0..param_count {
+      self.pos += 1;
+      if self.verify_index_overflow(self.pos) {
+        return Err(IError::message(format!(
+          "missing params command of line {}",
+          self.pos - i as usize,
+        )));
+      }
+      let string = self.lines[self.pos].to_owned();
+      if string.trim().len() < 2 {
+        return Err(IError::message(format!(
+          "missing params command of line {}",
+          self.pos - i as usize,
+        )));
+      }
+      params[i as usize] = string;
+    }
+
+    //update and run command
+    self.pos += 1;
+    if self.debug {
+      self.infra.println(format!("\npos: {}", self.pos));
+      self.infra.println(format!("opcode: {}", opcode));
+      self.infra.println(format!("count: {}", param_count));
+      self.infra.println(format!(
+        "params: {}, {}, {}",
+        params[0], params[1], params[2]
+      ));
+      self.infra.println(format!("string '{}'", string));
+      self.infra.println(format!("stack {:?}", self.stack.vec));
+    }
+    self.last_opcode = opcode;
+    self.command(
+      opcode,
+      Self::remove_comments(&params[0]),
+      Self::remove_comments(&params[1]),
+      Self::remove_comments(&params[2]),
+    )?;
+    Ok(None)
   }
   fn command(
     &mut self,
@@ -326,52 +327,84 @@ impl Interpreter {
     param3: &str,
   ) -> Result<(), Box<dyn Error>> {
     match opcode {
-      //ADD TO TWO VALUES
+      //OPERATIONS SUB/SUM/
       1 => {
-        let value = self.get_real_value(param1)?;
-        let value2 = self.get_real_value(param2)?;
+        let kind =
+          self.get_real_value(param1)?.force_u32(self.pos)?;
+        let value = self.get_real_value(param2)?;
+        let value2 = self.get_real_value(param3)?;
         if value.r#type != value2.r#type {
           return Err(IError::message(format!(
             "Adding with incompatible types {}",
             self.pos
           )));
         }
-
-        match value.r#type {
-          Type::Usigned => {
-            self.stack.push(u32_add(*value, *value2).into())
-          }
-          Type::Signed => {
-            self.stack.push(i32_add(*value, *value2).into())
-          }
-          Type::Floating => {
-            self.stack.push(f32_add(*value, *value2).into())
+        match kind {
+          0 => match value.r#type {
+            Type::Usigned => {
+              self.stack.push(u32_add(*value, *value2).into())
+            }
+            Type::Signed => {
+              self.stack.push(i32_add(*value, *value2).into())
+            }
+            Type::Floating => {
+              self.stack.push(f32_add(*value, *value2).into())
+            }
+          },
+          1 => match value.r#type {
+            Type::Signed => {
+              self.stack.push(i32_sub(*value, *value2).into())
+            }
+            Type::Usigned => {
+              self.stack.push(u32_sub(*value, *value2).into())
+            }
+            Type::Floating => {
+              self.stack.push(f32_sub(*value, *value2).into())
+            }
+          },
+          2 => match value.r#type {
+            Type::Signed => {
+              self.stack.push(i32_mul(*value, *value2).into())
+            }
+            Type::Usigned => {
+              self.stack.push(u32_mul(*value, *value2).into())
+            }
+            Type::Floating => {
+              self.stack.push(f32_mul(*value, *value2).into())
+            }
+          },
+          3 => match value.r#type {
+            Type::Signed => {
+              self.stack.push(i32_div(*value, *value2).into())
+            }
+            Type::Usigned => {
+              self.stack.push(u32_div(*value, *value2).into())
+            }
+            Type::Floating => {
+              self.stack.push(f32_div(*value, *value2).into())
+            }
+          },
+          _ => {
+            return Err(IError::message(
+              "This function is not implemented",
+            ))
           }
         }
       }
 
-      //SUBTRACT TWO VALUES
+      //IF LOWER JUMP
       2 => {
         let value = self.get_real_value(param1)?;
         let value2 = self.get_real_value(param2)?;
-
+        let pos = self.get_real_value(param3)?.force_u32(self.pos)?;
         if value.r#type != value2.r#type {
           return Err(IError::message(format!(
-            "Adding with incompatible types {}",
+            "Comparing with incompatible types {}",
             self.pos
           )));
         }
-
-        match value.r#type {
-          Type::Signed => {
-            self.stack.push(i32_sub(*value, *value2).into())
-          }
-          Type::Usigned => {
-            self.stack.push(u32_sub(*value, *value2).into())
-          }
-          Type::Floating => {
-            self.stack.push(f32_sub(*value, *value2).into())
-          }
+        if *value < *value2 {
+          self.pos = pos as usize;
         }
       }
 
@@ -385,6 +418,12 @@ impl Interpreter {
         let value = self.get_real_value(param1)?;
         let value2 = self.get_real_value(param2)?;
         let pos = self.get_real_value(param3)?.force_u32(self.pos)?;
+
+        if value.r#type != value2.r#type {
+          return Err(IError::message(
+            "Comparing incompatible types",
+          ));
+        }
 
         if value.r#type == Type::Floating {
           let value = f32::from_be_bytes(*value);
@@ -421,6 +460,14 @@ impl Interpreter {
             self.memory[value as usize] =
               buff.trim().parse::<u32>()?.into()
           }
+          2 => {
+            self.memory[value as usize] =
+              buff.trim().parse::<i32>()?.into()
+          }
+          3 => {
+            self.memory[value as usize] =
+              buff.trim().parse::<f32>()?.into()
+          }
           _ => {
             for (i, char) in buff.chars().enumerate() {
               if i < limit as usize {
@@ -450,7 +497,10 @@ impl Interpreter {
             "Invalid number type for ASCII",
           ));
         }
-        print!("{}", (u32::from_be_bytes(*stack_byte) as u8) as char);
+        self.infra.print(format!(
+          "{}",
+          (u32::from_be_bytes(*stack_byte) as u8) as char
+        ));
         self.stack.pop();
       }
 
@@ -465,9 +515,15 @@ impl Interpreter {
         let TypedByte { value, r#type } = self.stack.top()?;
 
         match r#type {
-          Type::Floating => print!("{}", f32::from_be_bytes(value)),
-          Type::Signed => print!("{}", i32::from_be_bytes(value)),
-          Type::Usigned => print!("{}", u32::from_be_bytes(value)),
+          Type::Floating => {
+            self.infra.print(format!("{}", f32::from_be_bytes(value)))
+          }
+          Type::Signed => {
+            self.infra.print(format!("{}", i32::from_be_bytes(value)))
+          }
+          Type::Usigned => {
+            self.infra.print(format!("{}", u32::from_be_bytes(value)))
+          }
         }
 
         self.stack.pop();
@@ -520,7 +576,7 @@ impl Interpreter {
         }
       }
       _ => {
-        println!("function not implemented");
+        self.infra.println("function not implemented".to_owned());
       }
     }
     Ok(())
@@ -542,7 +598,7 @@ impl Interpreter {
             )));
           }
           if self.debug {
-            println!("{}: {}", value, pos + 1);
+            self.infra.println(format!("{}: {}", value, pos + 1));
           }
           self.names.insert(value, pos + 2);
         }
@@ -622,6 +678,7 @@ impl Interpreter {
   }
 }
 
+#[cfg(not(test))]
 fn run(
   file_path: String,
   debug: bool,
@@ -636,13 +693,24 @@ fn run(
     return Err(IError::message("please specify a .robson file"));
   }
   let mut interpreter =
-    Interpreter::new(&file_path, 131072, Infra::new(None))?;
+    Interpreter::new(&file_path, 131072, Infra::new())?;
+
   interpreter.debug(debug);
   match interpreter.start_alias() {
     Some(err) => return Err(err),
     None => {}
   };
-  interpreter.start()?;
+  let mut result = Ok::<(), Box<dyn Error>>(());
+  loop {
+    match interpreter.execute_line() {
+      Ok(a) => {
+        if a.is_some() {
+          break;
+        }
+      }
+      Err(interpreter_err) => result = Err(interpreter_err),
+    }
+  }
 
   if interpreter.debug {
     print!("[");
@@ -651,26 +719,16 @@ fn run(
     }
     print!("]\n");
   }
-  Ok(())
+  result
 }
 
-pub fn color_print<T>(string: T, color: Color)
-where
-  T: Display,
-{
-  if execute!(
-    stdout(),
-    SetForegroundColor(color),
-    Print(format!("{}\n", string)),
-    ResetColor
-  )
-  .is_err()
-  {
-    println!("{}", string);
-  }
-}
-
+#[cfg(not(test))]
 fn main() {
+  use crossterm::style::Color;
+  use utils::color_print;
+
+  const VERSION: &str = "0.0.8";
+
   let args = &std::env::args().collect::<Vec<String>>();
   let mut file_path = String::new();
   let mut debug = false;

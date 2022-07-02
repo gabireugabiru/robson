@@ -1,4 +1,5 @@
 robson
+comeu 0
 comeu 12
 comeu 2
 
@@ -14,18 +15,52 @@ asoidoaishdoa
 seccond: 
 robson robson robson robson robson robson robson robson
 
-robson robson
+robson
+comeu 1
 comeu 12
 comeu 2
 
 robson robson robson robson
 chupou 0
 comeu 10
-lambeu :end
+lambeu :third
 
 crash1:
 robson robson robson robson robson robson robson robson
 asdasdasddsad
+
+third:
+robson robson robson robson robson robson robson robson
+
+robson
+comeu 2
+comeu 2
+comeu 3
+
+robson robson robson robson
+chupou 0
+comeu 6
+lambeu :forth 
+
+crash2: 
+robson robson robson robson robson robson robson robson
+aijdoaisjodis
+
+forth:
+robson robson robson robson robson robson robson robson
+robson
+comeu 3
+comeu 8
+comeu 2
+
+robson robson robson robson
+chupou 0
+comeu 4
+lambeu :end
+
+crash3:
+robson robson robson robson robson robson robson robson
+isajodiajsodi
 
 end:
 robson robson robson robson robson robson robson robson
