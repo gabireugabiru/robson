@@ -36,7 +36,7 @@ fn memory() {
 #[test]
 fn if_() {
   let mut interpreter = Interpreter::new(
-    "tests/memory.robson",
+    "tests/if.robson",
     200,
     Infra::new(String::new()),
   )

@@ -171,6 +171,8 @@ pub struct Interpreter {
   debug: bool,
   infra: Infra,
   last_opcode: u8,
+  #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
+  used_input: i64,
 }
 
 impl Interpreter {
@@ -202,8 +204,8 @@ impl Interpreter {
       names: HashMap::new(),
       infra,
       last_opcode: 0,
-      #[cfg(target_arch = "wasm32")]
-      used_input: i64,
+      #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
+      used_input: -1,
     })
   }
   pub fn debug(&mut self, new: bool) {
@@ -274,7 +276,7 @@ impl Interpreter {
       if self.used_input != self.pos as i64 {
         self.last_opcode = 6;
         self.used_input = self.pos as i64;
-        return Ok(());
+        return Ok(None);
       }
     }
 
@@ -404,7 +406,7 @@ impl Interpreter {
           )));
         }
         if *value < *value2 {
-          self.pos = pos as usize;
+          self.pos = (pos - 1) as usize;
         }
       }
 
@@ -432,7 +434,9 @@ impl Interpreter {
             self.pos = (pos - 1) as usize;
           }
         } else {
-          self.pos = (pos - 1) as usize;
+          if *value == *value2 {
+            self.pos = (pos - 1) as usize;
+          }
         }
       }
       //VERIFY THE STACK IF IS EMPTY JUMP
@@ -644,7 +648,7 @@ impl Interpreter {
         Ok(a)
       }
       "fudeu" => {
-        let value = splited[1].parse::<usize>()?;
+        let value = splited[1].trim().parse::<usize>()?;
         Ok(self.memory[value])
       }
       "lambeu" => {
@@ -661,8 +665,13 @@ impl Interpreter {
           .names
           .get(&value)
           .ok_or(IError::message(format!("cant find {}", value)))?;
-
         Ok((*a as u32).into())
+      }
+      "penetrou" => {
+        let value = splited[1].trim().parse::<usize>()?;
+        let address =
+          self.memory[value].force_u32(self.pos)? as usize;
+        Ok(self.memory[address])
       }
       token => {
         return Err(IError::message(format!(
@@ -708,7 +717,10 @@ fn run(
           break;
         }
       }
-      Err(interpreter_err) => result = Err(interpreter_err),
+      Err(interpreter_err) => {
+        result = Err(interpreter_err);
+        break;
+      }
     }
   }
 
@@ -727,7 +739,7 @@ fn main() {
   use crossterm::style::Color;
   use utils::color_print;
 
-  const VERSION: &str = "0.0.8";
+  const VERSION: &str = "0.0.9";
 
   let args = &std::env::args().collect::<Vec<String>>();
   let mut file_path = String::new();
