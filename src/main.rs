@@ -198,7 +198,7 @@ impl Interpreter {
       ],
       stack: Stack::default(),
       lines,
-      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 1, 1, 0],
+      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 0],
       pos: 0,
       debug: false,
       names: HashMap::new(),
@@ -271,6 +271,7 @@ impl Interpreter {
       }
       opcode += 1;
     }
+
     #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
     if opcode == 6 {
       if self.used_input != self.pos as i64 {
@@ -278,6 +279,8 @@ impl Interpreter {
         self.used_input = self.pos as i64;
         return Ok(None);
       }
+    } else {
+      self.used_input = -1;
     }
 
     let param_count = self.opcode_params[opcode as usize];
