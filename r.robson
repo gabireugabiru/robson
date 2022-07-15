@@ -1,0 +1,216 @@
+robson robson robson robson robson robson robson robson robson
+lambeu :start
+print_string:
+robson robson robson robson robson robson robson robson robson robson
+comeu 100
+print_string_mid:
+robson robson robson robson robson
+fudeu 100
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson robson robson
+lambeu :print_string_mid
+display_grid:
+robson robson robson robson robson robson robson robson robson robson
+comeu 101
+robson robson robson
+comeu 10
+comeu 10
+comeu 61
+comeu 61
+comeu 61
+comeu 61
+comeu 61
+comeu 10
+fudeu 8
+comeu 32
+fudeu 7
+comeu 32
+fudeu 6
+comeu 10
+fudeu 5
+comeu 32
+fudeu 4
+comeu 32
+fudeu 3
+comeu 10
+fudeu 2
+comeu 32
+fudeu 1
+comeu 32
+fudeu 0
+robson robson robson
+lambeu :display_grid_end
+robson robson robson robson robson robson robson robson robson
+lambeu :print_string
+display_grid_end:
+robson robson robson robson robson robson robson robson robson
+fudeu 101
+change_player:
+robson robson robson robson robson robson robson robson robson robson
+comeu 102
+robson robson robson robson
+fudeu 51
+comeu 88
+lambeu :is_X
+; is_O:
+    ;set player `X`
+    robson robson robson
+    comeu 88
+    robson robson robson robson robson robson robson robson robson robson
+    comeu 51
+    ;go out
+    robson robson robson robson robson robson robson robson robson
+    fudeu 102
+is_X:
+    ;set player `O`
+    robson robson robson
+    comeu 79
+    robson robson robson robson robson robson robson robson robson robson
+    comeu 51
+    ;go out
+    robson robson robson robson robson robson robson robson robson
+    fudeu 102
+verify_full:
+; Set got out
+robson robson robson robson robson robson robson robson robson robson
+comeu 70
+; Index
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson
+comeu 71
+verify_full_mid:
+robson robson robson robson
+penetrou 71
+comeu 88
+lambeu :has_shit
+robson robson robson robson
+penetrou 71
+comeu 79
+lambeu :has_shit
+; has_no_shit:
+    robson robson robson robson robson robson robson robson robson
+    fudeu 70
+has_shit:
+    robson robson robson robson
+    fudeu 71
+    comeu 8
+    lambeu :end
+    robson
+    comeu 0
+    fudeu 71
+    comeu 1
+    robson robson robson robson robson robson robson robson robson robson
+    comeu 71
+    robson robson robson robson robson robson robson robson robson
+    lambeu :verify_full_mid
+start:
+; set_data:
+;setting the starting data
+robson robson robson
+comeu 56
+comeu 55
+comeu 54
+comeu 53
+comeu 52
+comeu 51
+comeu 50
+comeu 49
+comeu 48
+robson robson robson robson robson robson robson robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson
+comeu 1
+robson robson robson robson robson robson robson robson robson robson
+comeu 2
+robson robson robson robson robson robson robson robson robson robson
+comeu 3
+robson robson robson robson robson robson robson robson robson robson
+comeu 4
+robson robson robson robson robson robson robson robson robson robson
+comeu 5
+robson robson robson robson robson robson robson robson robson robson
+comeu 6
+robson robson robson robson robson robson robson robson robson robson
+comeu 7
+robson robson robson robson robson robson robson robson robson robson
+comeu 8
+robson robson robson
+comeu 88
+robson robson robson robson robson robson robson robson robson robson
+comeu 51
+robson robson robson
+lambeu :next
+robson robson robson robson robson robson robson robson robson
+lambeu :display_grid
+next:
+; printing `pos: `
+robson robson robson
+comeu 32
+comeu 58
+comeu 115
+comeu 111
+comeu 80
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+; getting position
+robson robson robson robson robson robson
+comeu 50
+comeu 1
+comeu 1
+
+; verify if the position selected is under 9 for set setting outside data
+robson robson
+fudeu 50
+comeu 9
+lambeu :position_in_scope
+; position_out_of_scope: 
+    ; repeat
+    robson robson robson robson robson robson robson robson robson
+    lambeu :next
+position_in_scope: 
+    ;verify if the selected position is below 79
+    robson robson
+    penetrou 50
+    comeu 79
+    lambeu :avaible_place
+;    used_place:
+        ; repeat
+        robson robson robson robson robson robson robson robson robson
+        lambeu :next
+    avaible_place:
+        ; Setting the value for the position
+        robson robson robson
+        fudeu 51 ; the current player
+        robson robson robson robson robson robson robson robson robson robson
+        fudeu 50
+
+; display the grid
+robson robson robson
+lambeu :next1
+robson robson robson robson robson robson robson robson robson
+lambeu :display_grid
+next1:
+
+; change the current player
+robson robson robson
+lambeu :next2
+robson robson robson robson robson robson robson robson robson
+lambeu :change_player
+next2:
+
+; verify if the game has a draw
+robson robson robson
+lambeu :next3
+robson robson robson robson robson robson robson robson robson
+lambeu :verify_full
+next3:
+
+; repeat
+robson robson robson robson robson robson robson robson robson
+lambeu :next
+
+end:

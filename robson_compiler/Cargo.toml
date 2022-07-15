@@ -1,10 +1,8 @@
 [package]
-name = "robson"
-version = "0.0.7"
+name = "robson_compiler"
+version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "0.23.2"
-robson_compiler = { path = "./robson_compiler" }
