@@ -41,5 +41,3 @@ lambeu :print_stack_string
 robson robson robson ; Push
 comeu 10
 robson robson robson robson robson robson robson ; Print 
-
-end:

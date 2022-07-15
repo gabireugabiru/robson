@@ -228,27 +228,24 @@ impl Interpreter {
       return Ok(Some(()));
     }
     let pre_string = self.lines[self.pos].to_owned();
-    let mut string = pre_string.trim();
+    let mut string = pre_string.as_str();
 
-    string = Self::remove_comments(string);
+    string = Self::remove_comments(string).trim();
 
     // skip aliases
-    if string.contains(':') {
+    if string.chars().last() == Some(':') {
       self.pos += 1;
       return Ok(None);
     }
 
     // //skip spaces
-    if string.trim().is_empty() {
+    if string.is_empty() {
       self.pos += 1;
       return Ok(None);
     }
 
     // Implements the push abreviation
-    if self.last_opcode == 3
-      && !string.contains("robson")
-      && !string.contains(":")
-    {
+    if self.last_opcode == 3 && !string.contains("robson") {
       self.command(3, string, "", "")?;
       self.pos += 1;
       return Ok(None);
@@ -789,6 +786,8 @@ fn main() {
       _ => {}
     }
   }
+  use std::time::Instant;
+  let now = Instant::now();
   if let Err(err) = run(file_path, debug, lines) {
     color_print(
       format!(
@@ -798,4 +797,6 @@ fn main() {
       Color::Red,
     );
   }
+  let elapsed = now.elapsed();
+  println!("Elapsed: {:.2?}", elapsed);
 }

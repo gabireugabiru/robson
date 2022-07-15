@@ -1,0 +1,33 @@
+; set data
+robson robson robson
+comeu 0
+comeu 10
+robson robson robson robson robson robson robson robson robson robson
+comeu 1
+robson robson robson robson robson robson robson robson robson robson
+comeu 0
+run:
+robson robson robson
+fudeu 0
+robson robson robson robson robson robson robson robson
+
+robson robson robson robson
+fudeu 0
+fudeu 1
+lambeu :end
+
+robson
+comeu 0
+fudeu 0
+comeu 1
+
+robson robson robson robson robson robson robson robson robson robson
+comeu 0
+
+robson robson robson robson robson robson robson robson robson
+lambeu :run
+
+end:
+robson robson robson
+comeu 10
+robson robson robson robson robson robson robson
