@@ -1,7 +1,14 @@
-pub mod utils;
+use crate::{
+  data_struct::{Type, TypedByte},
+  utils::convert_kind_byte,
+};
+
+pub mod compiler;
+pub mod data_struct;
 pub mod interpreter;
 #[cfg(test)]
 mod tests;
+mod utils;
 
 pub trait Infra {
   fn read_line(&self) -> Result<String, std::io::Error>;
@@ -9,3 +16,49 @@ pub trait Infra {
   fn println(&mut self, to_print: String);
 }
 
+pub fn print_file_buffer(buffer: Vec<u8>) {
+  let mut command = 1;
+  let mut index = 0;
+  while index < buffer.len() {
+    let opcode = buffer[index];
+    let kind_byte = buffer[index + 1];
+    let param1_byte = [
+      buffer[index + 2],
+      buffer[index + 3],
+      buffer[index + 4],
+      buffer[index + 5],
+    ];
+    let param2_byte = [
+      buffer[index + 6],
+      buffer[index + 7],
+      buffer[index + 8],
+      buffer[index + 9],
+    ];
+    let param3_byte = [
+      buffer[index + 10],
+      buffer[index + 11],
+      buffer[index + 12],
+      buffer[index + 13],
+    ];
+
+    let types = buffer[index + 14];
+    let converted_types = convert_kind_byte(types);
+    let param1 = TypedByte {
+      value: param1_byte,
+      r#type: Type::from(converted_types[0]),
+    };
+    let param2 = TypedByte {
+      value: param2_byte,
+      r#type: Type::from(converted_types[1]),
+    };
+    let param3 = TypedByte {
+      value: param3_byte,
+      r#type: Type::from(converted_types[2]),
+    };
+
+    println!("command: {command}\nopcode: {opcode}\ntypes_byte: {types}\nkind_byte: {kind_byte:08b}\nparam1: {param1:?}\nparam2: {param2:?}\nparam3: {param3:?}\n\n");
+
+    index += 15;
+    command += 1;
+  }
+}

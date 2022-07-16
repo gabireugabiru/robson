@@ -51,3 +51,24 @@ pub fn approx_equal(a: f32, b: f32, decimal_places: u8) -> bool {
   let b = (b * factor).trunc();
   a == b
 }
+pub fn create_kind_byte(
+  type1: u8,
+  type2: u8,
+  type3: u8,
+  type4: u8,
+) -> u8 {
+  let mut kind_byte: u8 = 0;
+  kind_byte += type1 * 64;
+  kind_byte += type2 * 16;
+  kind_byte += type3 * 4;
+  kind_byte += type4;
+  kind_byte
+}
+pub fn convert_kind_byte(a: u8) -> [usize; 4] {
+  [
+    (a >> 6) as usize,
+    (((a >> 4) << 6) >> 6) as usize,
+    (((a >> 2) << 6) >> 6) as usize,
+    ((a << 6) >> 6) as usize,
+  ]
+}

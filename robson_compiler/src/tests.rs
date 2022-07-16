@@ -1,4 +1,4 @@
-use crate::{interpreter::Interpreter, Infra};
+use crate::{compiler::Compiler, interpreter::Interpreter, Infra};
 
 pub struct TestInfra {
   stdin: String,
@@ -26,78 +26,100 @@ impl Infra for TestInfra {
 
 #[test]
 fn push_and_print() {
-  let mut interpreter = Interpreter::new(
-    "tests/push.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/push.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 #[test]
 fn jump() {
-  let mut interpreter = Interpreter::new(
-    "tests/jump.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/jump.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  assert_eq!(interpreter.start_alias().is_none(), true);
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 
 #[test]
 fn memory() {
-  let mut interpreter = Interpreter::new(
-    "tests/memory.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/memory.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 
 #[test]
 fn if_() {
-  let mut interpreter = Interpreter::new(
-    "tests/if.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/if.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  assert_eq!(interpreter.start_alias().is_none(), true);
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 #[test]
 fn input() {
-  let mut interpreter = Interpreter::new(
-    "tests/input.robson",
-    200,
-    TestInfra::new("teste12321312".to_owned()),
+  let mut compiler = Compiler::new(
+    "tests/input.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+  let mut interpreter = Interpreter::new(
+    &compiled,
+    TestInfra::new("testeteste123".to_owned()),
+  )
+  .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 #[test]
 fn operations() {
-  let mut interpreter = Interpreter::new(
-    "tests/operations.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/operations.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  assert_eq!(interpreter.start_alias().is_none(), true);
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
 
 #[test]
 fn types() {
-  let mut interpreter = Interpreter::new(
-    "tests/types.robson",
-    200,
-    TestInfra::new(String::new()),
+  let mut compiler = Compiler::new(
+    "tests/types.robson".to_owned(),
+    TestInfra::new("".to_owned()),
   )
   .unwrap();
-  assert_eq!(interpreter.start_alias().is_none(), true);
-  while interpreter.execute_line().unwrap().is_none() {}
+  let compiled = compiler.compile().unwrap();
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
 }
