@@ -149,9 +149,9 @@ const TYPES: [Type; 3] = [Type::Usigned, Type::Signed, Type::Usigned];
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq, PartialOrd)]
 pub enum Type {
-  Usigned,
-  Signed,
-  Floating,
+  Usigned = 0,
+  Signed = 1,
+  Floating = 2,
 }
 
 impl From<usize> for Type {

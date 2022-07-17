@@ -25,6 +25,7 @@ pub struct Interpreter<'a> {
     &mut Interpreter,
     params: [(TypedByte, usize); 3],
   ) -> Result<(), IError>; 13],
+  operations: [[fn(&mut Interpreter, (TypedByte, TypedByte)); 3]; 4],
   convertion_array:
     [fn(TypedByte, &mut Interpreter) -> Result<TypedByte, IError>; 4],
 }
@@ -77,7 +78,7 @@ fn do_no_shit(
 ) -> Result<(), IError> {
   Ok(())
 }
-
+// OPCODE 1
 #[inline(always)]
 fn operations(
   interpreter: &mut Interpreter,
@@ -94,55 +95,10 @@ fn operations(
       interpreter.current_command
     )));
   }
-  match kind {
-    0 => match value.r#type {
-      Type::Usigned => {
-        interpreter.stack.push(u32_add(*value, *value2).into())
-      }
-      Type::Signed => {
-        interpreter.stack.push(i32_add(*value, *value2).into())
-      }
-      Type::Floating => {
-        interpreter.stack.push(f32_add(*value, *value2).into())
-      }
-    },
-    1 => match value.r#type {
-      Type::Signed => {
-        interpreter.stack.push(i32_sub(*value, *value2).into())
-      }
-      Type::Usigned => {
-        interpreter.stack.push(u32_sub(*value, *value2).into())
-      }
-      Type::Floating => {
-        interpreter.stack.push(f32_sub(*value, *value2).into())
-      }
-    },
-    2 => match value.r#type {
-      Type::Signed => {
-        interpreter.stack.push(i32_mul(*value, *value2).into())
-      }
-      Type::Usigned => {
-        interpreter.stack.push(u32_mul(*value, *value2).into())
-      }
-      Type::Floating => {
-        interpreter.stack.push(f32_mul(*value, *value2).into())
-      }
-    },
-    3 => match value.r#type {
-      Type::Signed => {
-        interpreter.stack.push(i32_div(*value, *value2).into())
-      }
-      Type::Usigned => {
-        interpreter.stack.push(u32_div(*value, *value2).into())
-      }
-      Type::Floating => {
-        interpreter.stack.push(f32_div(*value, *value2).into())
-      }
-    },
-    _ => {
-      return Err(IError::message("This function is not implemented"))
-    }
-  }
+  interpreter.operations[kind as usize][value.r#type as usize](
+    interpreter,
+    (value, value2),
+  );
   Ok(())
 }
 
@@ -394,13 +350,7 @@ impl<'a> Interpreter<'a> {
     infra: Box<dyn Infra>,
   ) -> Result<Self, IError> {
     Ok(Self {
-      memory: vec![
-        TypedByte {
-          value: [0; 4],
-          r#type: Type::Usigned
-        };
-        100
-      ],
+      memory: Vec::new(),
       stack: Stack::default(),
       debug: false,
       infra,
@@ -427,6 +377,28 @@ impl<'a> Interpreter<'a> {
         convert_chupou,
         conver_fudeu,
         convert_penetrou,
+      ],
+      operations: [
+        [
+          |int, (v1, v2)| int.stack.push(u32_add(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(i32_add(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(f32_add(*v1, *v2).into()),
+        ],
+        [
+          |int, (v1, v2)| int.stack.push(u32_sub(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(i32_sub(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(f32_sub(*v1, *v2).into()),
+        ],
+        [
+          |int, (v1, v2)| int.stack.push(u32_mul(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(i32_mul(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(f32_mul(*v1, *v2).into()),
+        ],
+        [
+          |int, (v1, v2)| int.stack.push(u32_div(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(i32_div(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(f32_div(*v1, *v2).into()),
+        ],
       ],
       #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
       used_input: -1,

@@ -3,7 +3,7 @@ use std::{
   error::Error,
   fmt::Display,
   fs::{self, File},
-  io::{stdin, Write},
+  io::{stdin, stdout, StdoutLock, Write},
   time::Instant,
 };
 
@@ -14,15 +14,20 @@ use robson_compiler::{
 };
 use utils::color_print;
 
-pub struct RunInfra {}
-impl RunInfra {
+pub struct RunInfra<'a> {
+  stdout: StdoutLock<'a>,
+}
+impl<'a> RunInfra<'a> {
   pub fn new() -> Box<Self> {
-    Box::new(Self {})
+    Box::new(Self {
+      stdout: stdout().lock(),
+    })
   }
 }
-impl Infra for RunInfra {
+impl<'a> Infra for RunInfra<'a> {
+  #[inline(always)]
   fn print(&mut self, to_print: String) {
-    print!("{to_print}");
+    write!(self.stdout, "{to_print}").unwrap();
   }
   fn println(&mut self, to_print: String) {
     println!("{to_print}");
@@ -76,7 +81,7 @@ fn compile_robson(
 fn warn_flags(flag: impl Display) {
   color_print(
     format!(
-      "!invalid flag {flag}, flags are: !\nDebug\n-----------------"
+      "!invalid flag '{flag}', flags are:!\nDebug\nCompile\nDebug\n\nThe execution will continue ignoring it\n\n-----------------"
     ),
     Color::Yellow,
   );
@@ -190,7 +195,10 @@ fn main() {
       );
     }
     if time {
-      color_print(format!("{:.2?}", now.elapsed()), Color::DarkGreen);
+      color_print(
+        format!("Execution time {:.2?}", now.elapsed()),
+        Color::DarkGreen,
+      );
     }
     return;
   }

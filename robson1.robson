@@ -1,43 +1,11 @@
-robson robson robson robson robson robson robson robson robson ; Jump
-lambeu :start
-
-print_stack_string:
-robson robson robson robson robson robson robson robson robson robson ; Set to Mem
-comeu 100
-
-print_stack_string_mid:
-
-robson robson robson robson robson ; Check Stack
-fudeu 100
-
-robson robson robson robson robson robson robson ; Print
-
-robson robson robson robson robson robson robson robson robson ; Jump 
-lambeu :print_stack_string_mid
-
-start:
-robson robson robson robson robson robson ; Input
+robson robson robson
+comeu 65
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson
 comeu 0
 comeu 0
-comeu 26
+comeu 50
+robson robson robson
+fudeu 0
+robson robson robson robson robson robson robson
 
-robson robson robson robson robson robson robson robson robson robson robson robson ; Get
-comeu 0
-
-robson robson robson ; Push
-comeu 32
-comeu 44
-comeu 111
-comeu 108
-comeu 108
-comeu 101
-comeu 72
-
-robson robson robson ; Push
-comeu 40
-robson robson robson robson robson robson robson robson robson ; Jump
-lambeu :print_stack_string 
-
-robson robson robson ; Push
-comeu 10
-robson robson robson robson robson robson robson ; Print 
