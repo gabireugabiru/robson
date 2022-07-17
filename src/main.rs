@@ -41,12 +41,14 @@ impl<'a> Infra for RunInfra<'a> {
 fn run_compiled(
   buffer: &[u8],
   debug: bool,
+  time: bool,
   lines: usize,
 ) -> Result<(), IError> {
   let mut interpreter = Interpreter::new(buffer, RunInfra::new())?;
   interpreter.debug(debug);
 
   let mut result = Ok::<(), IError>(());
+  let now = Instant::now();
   loop {
     match interpreter.run_buffer() {
       Ok(a) => {
@@ -60,12 +62,19 @@ fn run_compiled(
       }
     }
   }
+
   if debug {
     print!("[");
     for i in 0..lines {
       print!("{}, ", interpreter.memory[i]);
     }
     println!("]");
+  }
+  if time {
+    color_print(
+      format!("Execution time {:.2?}", now.elapsed()),
+      Color::DarkGreen,
+    );
   }
   result
 }
@@ -184,8 +193,7 @@ fn main() {
         return;
       }
     };
-    let now = Instant::now();
-    if let Err(err) = run_compiled(&buffer, debug, lines) {
+    if let Err(err) = run_compiled(&buffer, debug, time, lines) {
       color_print(
         format!(
           "\n--------------------\n{:?}\n--------------------",
@@ -194,12 +202,7 @@ fn main() {
         Color::Red,
       );
     }
-    if time {
-      color_print(
-        format!("Execution time {:.2?}", now.elapsed()),
-        Color::DarkGreen,
-      );
-    }
+
     return;
   }
   if compile || run || debug {
@@ -227,8 +230,9 @@ fn main() {
         return;
       }
     };
+    let elapsed = now.elapsed();
     color_print(
-      format!("Compiled in {:.2?}", now.elapsed()),
+      format!("Compiled in {:.2?}", elapsed),
       Color::DarkGreen,
     );
     //writing to file
@@ -244,7 +248,7 @@ fn main() {
 
     //Run the compiled binary
     if run || debug {
-      if let Err(err) = run_compiled(&buffer, debug, lines) {
+      if let Err(err) = run_compiled(&buffer, debug, false, lines) {
         color_print(
           format!(
             "\n--------------------\n{:?}\n--------------------",

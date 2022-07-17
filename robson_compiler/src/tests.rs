@@ -32,6 +32,7 @@ fn push_and_print() {
   )
   .unwrap();
   let compiled = compiler.compile().unwrap();
+
   let mut interpreter =
     Interpreter::new(&compiled, TestInfra::new(String::new()))
       .unwrap();

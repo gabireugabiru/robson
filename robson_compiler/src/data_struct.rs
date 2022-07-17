@@ -145,7 +145,8 @@ impl Stack {
   }
 }
 
-const TYPES: [Type; 3] = [Type::Usigned, Type::Signed, Type::Usigned];
+const TYPES: [Type; 3] =
+  [Type::Usigned, Type::Signed, Type::Floating];
 
 #[derive(Clone, Copy, PartialEq, Debug, Eq, PartialOrd)]
 pub enum Type {

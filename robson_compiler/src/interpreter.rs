@@ -446,11 +446,11 @@ impl<'a> Interpreter<'a> {
       value: param3_byte,
       r#type: Type::from(converted_types[2]),
     };
-
     if self.debug {
       let command = self.current_command;
-      println!("\ncommand: {command}\nopcode: {opcode}\ntypes_byte: {types}\nkind_byte: {kind_byte:08b}\nparam1: {param1}\nparam2: {param2}\nparam3: {param3}\nstack: {}", self.stack);
+      println!("\ncommand: {command}\nopcode: {opcode}\ntypes_byte: {types:08b}\nkind_byte: {kind_byte:08b}\nparam1: {param1}\nparam2: {param2}\nparam3: {param3}\nstack: {}", self.stack);
     }
+
     self.index += 15;
     self.execute_command(
       opcode,
@@ -466,8 +466,9 @@ impl<'a> Interpreter<'a> {
     }
   }
   pub fn validate_until(&mut self, address: usize) {
-    while self.memory.len() <= address {
-      self.memory.push(0u32.into());
+    if self.memory.len() <= address {
+      let byte: TypedByte = 0.into();
+      self.memory.resize(address + 1, byte);
     }
   }
   pub fn convert(
