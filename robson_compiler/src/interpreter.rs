@@ -102,6 +102,7 @@ fn operations(
   Ok(())
 }
 
+//OPCODE 2
 #[inline(always)]
 fn if_lower(
   interpreter: &mut Interpreter,
@@ -124,6 +125,7 @@ fn if_lower(
   Ok(())
 }
 
+//OPCODE 3
 fn push_stack(
   interpreter: &mut Interpreter,
   [param1, ..]: [(TypedByte, usize); 3],
@@ -132,6 +134,8 @@ fn push_stack(
   interpreter.stack.push(value);
   Ok(())
 }
+
+//OPCODE 4
 fn if_true_jump(
   interpreter: &mut Interpreter,
   [param1, param2, param3]: [(TypedByte, usize); 3],
@@ -158,6 +162,7 @@ fn if_true_jump(
   Ok(())
 }
 
+//OPCODE 5
 #[inline(always)]
 fn vstack_jump(
   interpreter: &mut Interpreter,
@@ -172,6 +177,7 @@ fn vstack_jump(
   Ok(())
 }
 
+//OPCODE 6
 #[inline(always)]
 fn input(
   interpreter: &mut Interpreter,
@@ -193,16 +199,19 @@ fn input(
 
   match kind {
     1 => {
+      interpreter.validate_until(value);
       interpreter.memory[value] = buff.trim().parse::<u32>()?.into()
     }
     2 => {
+      interpreter.validate_until(value);
       interpreter.memory[value] = buff.trim().parse::<i32>()?.into()
     }
     3 => {
+      interpreter.validate_until(value);
       interpreter.memory[value] = buff.trim().parse::<f32>()?.into()
     }
     _ => {
-      let address_to = value + limit;
+      let address_to = value + limit + 2;
       interpreter.validate_until(address_to as usize);
       for (i, char) in buff.chars().enumerate() {
         if i < limit as usize {
@@ -220,6 +229,7 @@ fn input(
   Ok(())
 }
 
+//OPCODE 7
 #[inline(always)]
 fn print(
   interpreter: &mut Interpreter,
@@ -246,6 +256,7 @@ fn print(
   Ok(())
 }
 
+//OPCODE 8
 #[inline(always)]
 fn printnumber(
   interpreter: &mut Interpreter,
@@ -275,6 +286,7 @@ fn printnumber(
   Ok(())
 }
 
+//OPCODE 9
 #[inline(always)]
 fn jump(
   interpreter: &mut Interpreter,
@@ -287,6 +299,7 @@ fn jump(
   Ok(())
 }
 
+//OPCODE 10
 #[inline(always)]
 fn set(
   interpreter: &mut Interpreter,
@@ -303,6 +316,7 @@ fn set(
   Ok(())
 }
 
+//OPCODE 11
 #[inline(always)]
 fn pop_stack(
   interpreter: &mut Interpreter,
@@ -314,6 +328,7 @@ fn pop_stack(
   Ok(())
 }
 
+//OPCODE 12
 #[inline(always)]
 fn load_string(
   interpreter: &mut Interpreter,
@@ -467,7 +482,7 @@ impl<'a> Interpreter<'a> {
   }
   pub fn validate_until(&mut self, address: usize) {
     if self.memory.len() <= address {
-      let byte: TypedByte = 0.into();
+      let byte: TypedByte = 0u32.into();
       self.memory.resize(address + 1, byte);
     }
   }

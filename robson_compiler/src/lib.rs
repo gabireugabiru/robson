@@ -11,7 +11,7 @@ mod tests;
 mod utils;
 
 pub trait Infra {
-  fn read_line(&self) -> Result<String, std::io::Error>;
+  fn read_line(&mut self) -> Result<String, std::io::Error>;
   fn print(&mut self, to_print: String);
   fn println(&mut self, to_print: String);
 }

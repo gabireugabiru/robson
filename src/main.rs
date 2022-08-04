@@ -32,7 +32,7 @@ impl<'a> Infra for RunInfra<'a> {
   fn println(&mut self, to_print: String) {
     println!("{to_print}");
   }
-  fn read_line(&self) -> Result<String, std::io::Error> {
+  fn read_line(&mut self) -> Result<String, std::io::Error> {
     let mut buffer = String::new();
     stdin().read_line(&mut buffer)?;
     Ok(buffer)
