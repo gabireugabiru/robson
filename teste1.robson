@@ -1,0 +1,136 @@
+; ADDRESS 5 = CURRENT KEY
+; ADDRESS 6 = TEMPORARY CURRENT KEY
+; ADDRESS 50 AND FORWARD = GRID
+; ADDRESS 0 = POSITION
+; ADDRESS 1 = LOCAL USAGE
+; ADDRESS 2 = FORWARDING ADDRESS
+
+; SET TIMEOUT
+robson robson robson
+comeu 34
+comeu 0
+
+robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 1
+
+; ENTER RAW MODE
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 0
+
+; START COUNTING TIME
+robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 0
+
+loop:
+
+; CHECK TIME PASSED
+robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 2
+
+robson robson
+chupou 0
+comeu 1
+lambeu :checks
+
+    ; IF TIME PASSED IS GREATER THAN THE BX UPDATE AND RESET COUNTING
+
+    robson robson robson robson robson robson robson robson robson robson robson robson robson
+    comeu 0
+
+    robson robson robson robson robson robson robson robson robson
+    lambeu :update
+
+; ELSE IGNORE
+checks:
+
+; GET KEYBOARD INPUT
+robson robson robson
+comeu 1
+comeu 0
+
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 3
+
+robson robson robson robson robson robson robson robson robson robson
+comeu 6
+
+; CHECK KEYBOARD INPUT
+robson robson robson robson
+fudeu 6
+comeu 10000
+lambeu :end
+
+; IGNORE IF IS 0
+robson robson robson robson
+fudeu 6
+comeu 0
+lambeu :loop
+
+
+; SET THE KEY
+robson robson
+fudeu 6
+comeu 10000
+lambeu :set_current_key
+
+; CHECK END
+
+; LOOPS
+robson robson robson robson robson robson robson robson robson
+lambeu :loop
+
+; !!!!!!!!!!!!!!
+; FUNCTION AREA
+; !!!!!!!!!!!!!!
+
+set_current_key:
+    ; MOVES TEMPORARY CURRENT KEY TO REAL CURRENT KEY
+    robson robson robson
+    fudeu 6
+    robson robson robson robson robson robson robson robson robson robson
+    comeu 5
+
+    robson robson robson robson robson robson robson robson robson
+    lambeu :loop
+
+; UPDATE FUNCTION
+update:
+    ; CLEAR THE SCREEN
+    robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+    comeu 2
+
+    ; PRINT MAP
+
+    robson robson robson
+    fudeu 5
+    robson robson robson robson robson robson robson robson
+
+    robson robson robson
+    comeu 10
+    comeu 13
+
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+
+    robson robson robson
+    fudeu 5
+
+    robson robson robson robson robson robson robson
+
+    ; FLUSH CHANGES
+    robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+
+    ; GO CHECK DEEZ NUTS
+    robson robson robson robson robson robson robson robson robson
+    lambeu :checks
+
+; !!!!!!!!!!!!!!
+; FUNCTION AREA ENDS
+; !!!!!!!!!!!!!!
+
+end: 
+
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 2
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 1

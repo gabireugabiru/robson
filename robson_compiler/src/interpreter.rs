@@ -1,4 +1,7 @@
-use std::io::Write;
+use std::{
+  io::Write,
+  time::{Duration, Instant},
+};
 
 use crate::{
   data_struct::{IError, Stack, Type, TypedByte},
@@ -13,21 +16,23 @@ use super::utils::{
 
 pub struct Interpreter<'a> {
   pub memory: Vec<TypedByte>,
-  stack: Stack,
   pub debug: bool,
+  time: Option<Instant>,
+  duration: Option<Duration>,
+  stack: Stack,
   infra: Box<dyn Infra>,
   index: usize,
   current_command: usize,
   buffer: &'a [u8],
-  #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
-  used_input: i64,
   opcode_functions: [fn(
     &mut Interpreter,
     params: [(TypedByte, usize); 3],
-  ) -> Result<(), IError>; 13],
+  ) -> Result<(), IError>; 16],
   operations: [[fn(&mut Interpreter, (TypedByte, TypedByte)); 3]; 4],
   convertion_array:
     [fn(TypedByte, &mut Interpreter) -> Result<TypedByte, IError>; 4],
+  #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
+  used_input: i64,
 }
 #[inline(always)]
 fn not_convert(
@@ -43,12 +48,12 @@ fn convert_chupou(
   interpreter: &mut Interpreter,
 ) -> Result<TypedByte, IError> {
   let value = u32::from_be_bytes(*byte);
-  let position = (1 + value) as usize;
-  if interpreter.stack.len() < position {
-    Err(IError::message("out of the stack"))
-  } else {
-    Ok(interpreter.stack[interpreter.stack.len() - position])
+  if value != 0 {
+    return Err(IError::message("chupou is not 0"));
   }
+  let top = interpreter.stack.top()?;
+  interpreter.stack.pop();
+  Ok(top)
 }
 
 #[inline(always)]
@@ -69,8 +74,11 @@ fn convert_penetrou(
 ) -> Result<TypedByte, IError> {
   let address = byte.force_u32(interpreter.current_command)? as usize;
   interpreter.validate_until(address);
-
-  Ok(interpreter.memory[address])
+  let address2 = interpreter.memory[address]
+    .force_u32(interpreter.current_command)?
+    as usize;
+  interpreter.validate_until(address2);
+  Ok(interpreter.memory[address2])
 }
 fn do_no_shit(
   _: &mut Interpreter,
@@ -359,6 +367,92 @@ fn load_string(
   Ok(())
 }
 
+//OPCODE 13
+fn time_operations(
+  interpreter: &mut Interpreter,
+  [param1, ..]: [(TypedByte, usize); 3],
+) -> Result<(), IError> {
+  match interpreter
+    .convert(param1.0, param1.1)?
+    .force_u32(interpreter.current_command)?
+  {
+    // SET ax
+    0 => {
+      interpreter.time = Some(Instant::now());
+    }
+    //SET bx
+    1 => {
+      let a = interpreter.stack.top()?.value;
+      interpreter.stack.pop();
+      let b = interpreter.stack.top()?.value;
+      let result = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
+
+      interpreter.duration =
+        Some(Duration::from_millis(u64::from_be_bytes(result)))
+    }
+    // CMP ax elapsed to bx
+    2 => {
+      if let Some(a) = interpreter.time {
+        if let Some(b) = interpreter.duration {
+          let elapsed = a.elapsed();
+          if elapsed < b {
+            interpreter.stack.push(0u32.into());
+          } else if elapsed == b {
+            interpreter.stack.push(1u32.into());
+          } else {
+            interpreter.stack.push(2u32.into());
+          }
+        }
+      }
+    }
+    _ => {}
+  }
+  Ok(())
+}
+//OPCODE 14
+fn flush(
+  interpreter: &mut Interpreter,
+  _: [(TypedByte, usize); 3],
+) -> Result<(), IError> {
+  interpreter.infra.flush();
+  Ok(())
+}
+//OPCODE 15
+fn terminal_commands(
+  interpreter: &mut Interpreter,
+  [param1, ..]: [(TypedByte, usize); 3],
+) -> Result<(), IError> {
+  match interpreter
+    .convert(param1.0, param1.1)?
+    .force_u32(interpreter.current_command)?
+  {
+    // RAW MODE
+    0 => {
+      interpreter.infra.enable_raw_mode()?;
+    }
+    // DISABLE RAW MODE
+    1 => {
+      interpreter.infra.disable_raw_mode()?;
+    }
+    // CLEAR
+    2 => {
+      interpreter.infra.clear()?;
+    }
+    // POLL KEYBOARD
+    3 => {
+      let a = interpreter.stack.top()?.value;
+      interpreter.stack.pop();
+      let b = interpreter.stack.top()?.value;
+      let result = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
+      let value =
+        interpreter.infra.poll(u64::from_be_bytes(result))?;
+      interpreter.stack.push(value.into());
+    }
+    _ => {}
+  }
+  Ok(())
+}
+
 impl<'a> Interpreter<'a> {
   pub fn new(
     buffer: &'a [u8],
@@ -368,6 +462,8 @@ impl<'a> Interpreter<'a> {
       memory: Vec::new(),
       stack: Stack::default(),
       debug: false,
+      time: None,
+      duration: None,
       infra,
       index: 0,
       buffer,
@@ -386,6 +482,9 @@ impl<'a> Interpreter<'a> {
         set,
         pop_stack,
         load_string,
+        time_operations,
+        flush,
+        terminal_commands,
       ],
       convertion_array: [
         not_convert,

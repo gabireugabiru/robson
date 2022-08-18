@@ -12,7 +12,7 @@ use crate::{
 
 pub struct Compiler {
   lines: Vec<String>,
-  opcode_params: [u8; 14],
+  opcode_params: [u8; 16],
   names: HashMap<String, usize>,
   pos: usize,
   debug: bool,
@@ -39,7 +39,7 @@ impl Compiler {
       last_opcode: 0,
       lines,
       names: HashMap::new(),
-      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 0],
+      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 1, 0, 1],
       pos: 0,
     })
   }
@@ -93,7 +93,12 @@ impl Compiler {
         }
         opcode += 1;
       }
-
+      if opcode as usize >= self.opcode_params.len() {
+        return Err(IError::message(format!(
+          "invalid opcode of line {}",
+          self.pos + 1
+        )));
+      }
       let param_count = self.opcode_params[opcode as usize];
       for i in 0..param_count {
         self.pos += 1;

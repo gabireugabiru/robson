@@ -1,3 +1,5 @@
+use data_struct::IError;
+
 use crate::{
   data_struct::{Type, TypedByte},
   utils::convert_kind_byte,
@@ -14,6 +16,11 @@ pub trait Infra {
   fn read_line(&mut self) -> Result<String, std::io::Error>;
   fn print(&mut self, to_print: String);
   fn println(&mut self, to_print: String);
+  fn flush(&mut self);
+  fn enable_raw_mode(&self) -> Result<(), IError>;
+  fn disable_raw_mode(&self) -> Result<(), IError>;
+  fn clear(&mut self) -> Result<(), IError>;
+  fn poll(&self, duration: u64) -> Result<u32, IError>;
 }
 
 pub fn print_file_buffer(buffer: Vec<u8>) {

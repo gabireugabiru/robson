@@ -4,10 +4,16 @@ use std::{
   fmt::Display,
   fs::{self, File},
   io::{stdin, stdout, StdoutLock, Write},
-  time::Instant,
+  time::{Duration, Instant},
 };
 
-use crossterm::style::Color;
+use crossterm::{
+  cursor,
+  event::{poll, read, Event, KeyCode},
+  execute,
+  style::Color,
+  terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
+};
 use robson_compiler::{
   compiler::Compiler, data_struct::IError, interpreter::Interpreter,
   Infra,
@@ -36,6 +42,55 @@ impl<'a> Infra for RunInfra<'a> {
     let mut buffer = String::new();
     stdin().read_line(&mut buffer)?;
     Ok(buffer)
+  }
+  fn flush(&mut self) {
+    self.stdout.flush().unwrap();
+  }
+  fn clear(&mut self) -> Result<(), IError> {
+    execute!(
+      self.stdout,
+      Clear(ClearType::All),
+      Clear(ClearType::Purge),
+      cursor::MoveTo(0, 0)
+    )?;
+    Ok(())
+  }
+  fn enable_raw_mode(&self) -> Result<(), IError> {
+    enable_raw_mode()?;
+    Ok(())
+  }
+  fn disable_raw_mode(&self) -> Result<(), IError> {
+    disable_raw_mode()?;
+    Ok(())
+  }
+  fn poll(&self, duration: u64) -> Result<u32, IError> {
+    let mut code = 0;
+    if poll(Duration::from_millis(duration))? {
+      match read()? {
+        Event::Key(key) => {
+          code = match &key.code {
+            KeyCode::Char(a) => *a as u32,
+            KeyCode::Esc => 10000,
+            KeyCode::BackTab => 10001,
+            KeyCode::Backspace => 10002,
+            KeyCode::Delete => 10003,
+            KeyCode::Down => 10004,
+            KeyCode::End => 10005,
+            KeyCode::Enter => 10006,
+            KeyCode::Insert => 10007,
+            KeyCode::Left => 10008,
+            KeyCode::PageDown => 10009,
+            KeyCode::PageUp => 10010,
+            KeyCode::Right => 10011,
+            KeyCode::Tab => 10012,
+            KeyCode::Up => 10013,
+            _ => 0,
+          }
+        }
+        _ => {}
+      }
+    }
+    Ok(code)
   }
 }
 fn run_compiled(
