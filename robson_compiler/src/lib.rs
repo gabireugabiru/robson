@@ -19,8 +19,12 @@ pub trait Infra {
   fn flush(&mut self);
   fn enable_raw_mode(&self) -> Result<(), IError>;
   fn disable_raw_mode(&self) -> Result<(), IError>;
-  fn clear(&mut self) -> Result<(), IError>;
+  fn clear_purge(&mut self) -> Result<(), IError>;
+  fn clear_all(&mut self) -> Result<(), IError>;
   fn poll(&self, duration: u64) -> Result<u32, IError>;
+  fn hide_cursor(&mut self) -> Result<(), IError>;
+  fn show_cursor(&mut self) -> Result<(), IError>;
+  fn move_cursor(&mut self, x: u32, y: u32) -> Result<(), IError>;
 }
 
 pub fn print_file_buffer(buffer: Vec<u8>) {

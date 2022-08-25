@@ -1,21 +1,39 @@
-; ADDRESS 5 = CURRENT KEY
-; ADDRESS 6 = TEMPORARY CURRENT KEY
-; ADDRESS 50 AND FORWARD = GRID
-; ADDRESS 0 = POSITION
-; ADDRESS 1 = LOCAL USAGE
 ; ADDRESS 2 = FORWARDING ADDRESS
 
 ; SET TIMEOUT
 robson robson robson
-comeu 34
+comeu 100
 comeu 0
 
 robson robson robson robson robson robson robson robson robson robson robson robson robson
 comeu 1
 
 ; ENTER RAW MODE
+robson robson robson
+comeu 1
 robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
 comeu 0
+
+; HIDE THE CURSOR
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 3
+
+; FULL CLEAR CLEAR THE SCREEN
+robson robson robson
+comeu 1
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 1
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 1
+robson robson robson
+comeu 0
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 4
 
 ; START COUNTING TIME
 robson robson robson robson robson robson robson robson robson robson robson robson robson
@@ -49,7 +67,7 @@ comeu 1
 comeu 0
 
 robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 3
+comeu 2
 
 robson robson robson robson robson robson robson robson robson robson
 comeu 6
@@ -96,19 +114,30 @@ set_current_key:
 ; UPDATE FUNCTION
 update:
     ; CLEAR THE SCREEN
+    robson robson robson
+    comeu 0
     robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
-    comeu 2
+    comeu 1
+    robson robson robson
+    comeu 0
+    comeu 0
+    robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+    comeu 4
 
     ; PRINT MAP
-
     robson robson robson
     fudeu 5
     robson robson robson robson robson robson robson robson
-
     robson robson robson
     comeu 10
     comeu 13
+    comeu 32
+    comeu 32
+    comeu 32
 
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
 
@@ -129,8 +158,18 @@ update:
 ; !!!!!!!!!!!!!!
 
 end: 
-
+; SHOW CURSOR AGAIN
+robson robson robson
+comeu 1
 robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 2
+comeu 3
+; CLEAR
+robson robson robson
+comeu 1
 robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
 comeu 1
+; DISABLE RAW MODE
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 0

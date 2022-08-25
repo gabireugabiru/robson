@@ -428,18 +428,30 @@ fn terminal_commands(
   {
     // RAW MODE
     0 => {
-      interpreter.infra.enable_raw_mode()?;
-    }
-    // DISABLE RAW MODE
-    1 => {
-      interpreter.infra.disable_raw_mode()?;
+      let on_off = interpreter
+        .stack
+        .top()?
+        .force_u32(interpreter.current_command)?;
+      if on_off == 0 {
+        interpreter.infra.disable_raw_mode()?;
+      } else {
+        interpreter.infra.enable_raw_mode()?;
+      }
     }
     // CLEAR
-    2 => {
-      interpreter.infra.clear()?;
+    1 => {
+      let r#type = interpreter
+        .stack
+        .top()?
+        .force_u32(interpreter.current_command)?;
+      if r#type == 0 {
+        interpreter.infra.clear_purge()?;
+      } else {
+        interpreter.infra.clear_all()?;
+      }
     }
     // POLL KEYBOARD
-    3 => {
+    2 => {
       let a = interpreter.stack.top()?.value;
       interpreter.stack.pop();
       let b = interpreter.stack.top()?.value;
@@ -447,6 +459,30 @@ fn terminal_commands(
       let value =
         interpreter.infra.poll(u64::from_be_bytes(result))?;
       interpreter.stack.push(value.into());
+    }
+    // SHOW/HIDE CURSOR
+    3 => {
+      let on_off = interpreter
+        .stack
+        .top()?
+        .force_u32(interpreter.current_command)?;
+      if on_off == 0 {
+        interpreter.infra.hide_cursor()?;
+      } else {
+        interpreter.infra.show_cursor()?;
+      }
+    }
+    // MOVE CURSOR
+    4 => {
+      let x = interpreter
+        .stack
+        .top()?
+        .force_u32(interpreter.current_command)?;
+      let y = interpreter
+        .stack
+        .top()?
+        .force_u32(interpreter.current_command)?;
+      interpreter.infra.move_cursor(x, y)?;
     }
     _ => {}
   }

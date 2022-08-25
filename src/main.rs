@@ -3,14 +3,14 @@ use std::{
   error::Error,
   fmt::Display,
   fs::{self, File},
-  io::{stdin, stdout, StdoutLock, Write},
+  io::{stdin, stdout, ErrorKind, StdoutLock, Write},
   time::{Duration, Instant},
 };
 
 use crossterm::{
   cursor,
   event::{poll, read, Event, KeyCode},
-  execute,
+  queue,
   style::Color,
   terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
@@ -46,13 +46,12 @@ impl<'a> Infra for RunInfra<'a> {
   fn flush(&mut self) {
     self.stdout.flush().unwrap();
   }
-  fn clear(&mut self) -> Result<(), IError> {
-    execute!(
-      self.stdout,
-      Clear(ClearType::All),
-      Clear(ClearType::Purge),
-      cursor::MoveTo(0, 0)
-    )?;
+  fn clear_all(&mut self) -> Result<(), IError> {
+    queue!(self.stdout, Clear(ClearType::All))?;
+    Ok(())
+  }
+  fn clear_purge(&mut self) -> Result<(), IError> {
+    queue!(self.stdout, Clear(ClearType::Purge))?;
     Ok(())
   }
   fn enable_raw_mode(&self) -> Result<(), IError> {
@@ -91,6 +90,18 @@ impl<'a> Infra for RunInfra<'a> {
       }
     }
     Ok(code)
+  }
+  fn hide_cursor(&mut self) -> Result<(), IError> {
+    queue!(self.stdout, cursor::Hide)?;
+    Ok(())
+  }
+  fn show_cursor(&mut self) -> Result<(), IError> {
+    queue!(self.stdout, cursor::Show)?;
+    Ok(())
+  }
+  fn move_cursor(&mut self, x: u32, y: u32) -> Result<(), IError> {
+    queue!(self.stdout, cursor::MoveTo(x as u16, y as u16))?;
+    Ok(())
   }
 }
 fn run_compiled(
@@ -155,13 +166,28 @@ fn write_to_file(
   buffer: &[u8],
   file_path: &str,
 ) -> Result<(), std::io::Error> {
-  let mut file = File::create(file_path.replace(".robson", ".rbsn"))?;
-  file.write(buffer)?;
+  // CREATE PATH MODEL "out/NAME.rbsn"
+  let mut true_path = String::from("out/");
+  true_path.push_str(&file_path.replace(".robson", ".rbsn"));
+
+  let file = File::create(&true_path);
+  if let Err(err) = file {
+    // CREATE OUT DIR IF IT DOESNT EXISTS
+    if err.kind() == ErrorKind::NotFound {
+      std::fs::create_dir("out/")?;
+      let mut file = File::create(true_path)?;
+      // WRITE THE BINARY
+      file.write(buffer)?;
+    }
+  } else {
+    // WRITE THE BINARY
+    file.unwrap().write(buffer)?;
+  }
   Ok(())
 }
 
 fn main() {
-  const VERSION: &str = "0.1.0";
+  const VERSION: &str = "0.1.2";
 
   let args = &std::env::args().collect::<Vec<String>>();
   let mut raw_run = true;
@@ -174,9 +200,9 @@ fn main() {
   let valid_flags = ["debug", "compile", "run", "time"];
 
   for (i, string) in args.iter().enumerate() {
-    let string = string.to_lowercase();
-    let string = string.as_str();
     if i > 1 {
+      let string = string.to_lowercase();
+      let string = string.as_str();
       if valid_flags.contains(&string) {
         if !debug && !run && !compile && !time {
           match string {
@@ -240,7 +266,7 @@ fn main() {
       Err(err) => {
         color_print(
           format!(
-            "\n--------------------\n{:?}\n--------------------",
+            "\n--------------------\n{}\n--------------------",
             err
           ),
           Color::Red,
@@ -251,7 +277,7 @@ fn main() {
     if let Err(err) = run_compiled(&buffer, debug, time, lines) {
       color_print(
         format!(
-          "\n--------------------\n{:?}\n--------------------",
+          "\n--------------------\n{}\n--------------------",
           err
         ),
         Color::Red,
@@ -277,7 +303,7 @@ fn main() {
       Err(err) => {
         color_print(
           format!(
-            "\n--------------------\n{:?}\n--------------------",
+            "\n--------------------\n{}\n--------------------",
             err
           ),
           Color::Red,
@@ -294,11 +320,12 @@ fn main() {
     if let Err(err) = write_to_file(&buffer, &file_path) {
       color_print(
         format!(
-          "\n--------------------\n{:?}\n--------------------",
+          "\n--------------------\n{}\n--------------------",
           err
         ),
         Color::Red,
       );
+      return;
     }
 
     //Run the compiled binary
@@ -306,7 +333,7 @@ fn main() {
       if let Err(err) = run_compiled(&buffer, debug, false, lines) {
         color_print(
           format!(
-            "\n--------------------\n{:?}\n--------------------",
+            "\n--------------------\n{}\n--------------------",
             err
           ),
           Color::Red,

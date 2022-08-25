@@ -1,6 +1,5 @@
 use std::{
   collections::HashMap,
-  fs::OpenOptions,
   io::{BufRead, BufReader},
 };
 
@@ -25,8 +24,7 @@ impl Compiler {
     path: String,
     infra: Box<dyn Infra>,
   ) -> Result<Self, IError> {
-    let file = OpenOptions::new().read(true).open(path)?;
-
+    let file = std::fs::File::options().read(true).open(path)?;
     let buff_reader = BufReader::new(&file);
     let lines = buff_reader
       .lines()
