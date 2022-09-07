@@ -270,12 +270,6 @@ fn printnumber(
   interpreter: &mut Interpreter,
   [..]: [(TypedByte, usize); 3],
 ) -> Result<(), IError> {
-  if interpreter.stack.is_empty() {
-    return Err(IError::message(format!(
-      "trying to use the stack while empty at command {}",
-      interpreter.current_command
-    )));
-  }
   let TypedByte { value, r#type } = interpreter.stack.top()?;
 
   match r#type {

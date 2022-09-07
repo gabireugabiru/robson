@@ -1,33 +1,78 @@
-; set data
 robson robson robson
-comeu 0
-comeu 1000000
-robson robson robson robson robson robson robson robson robson robson
-comeu 1
-robson robson robson robson robson robson robson robson robson robson
-comeu 0
-run:
-robson robson robson
-fudeu 0
-robson robson robson robson robson robson robson robson
+comeu 32
+comeu 58
+comeu 49
+comeu 114
+comeu 101
+comeu 98
+comeu 109
+comeu 117
+comeu 110
 
-robson robson robson robson
-fudeu 0
-fudeu 1
-lambeu :end
+robsons print.robson
+
+robson robson robson robson robson robson
+comeu 0
+comeu 3
+comeu 1
+
+robson robson robson
+comeu 32
+comeu 58
+comeu 50
+comeu 114
+comeu 101
+comeu 98
+comeu 109
+comeu 117
+comeu 110
+
+robsons print.robson
+
+robson robson robson robson robson robson
+comeu 1
+comeu 3
+comeu 1
 
 robson
 comeu 0
+fudeu 1
 fudeu 0
-comeu 1
 
 robson robson robson robson robson robson robson robson robson robson
-comeu 0
+comeu 2
 
-robson robson robson robson robson robson robson robson robson
-lambeu :run
+robson robson robson
+fudeu 0
 
-end:
+robson robson robson robson robson robson robson robson
+
+robson robson robson
+comeu 32
+comeu 43
+comeu 32
+
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+
+robson robson robson
+fudeu 1
+robson robson robson robson robson robson robson robson
+
+robson robson robson
+comeu 32
+comeu 61
+comeu 32
+
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+robson robson robson robson robson robson robson
+
+robson robson robson
+fudeu 2
+robson robson robson robson robson robson robson robson
+
 robson robson robson
 comeu 10
 robson robson robson robson robson robson robson

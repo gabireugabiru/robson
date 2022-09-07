@@ -1,9 +1,9 @@
 mod utils;
 use std::{
-  error::Error,
   fmt::Display,
   fs::{self, File},
   io::{stdin, stdout, ErrorKind, StdoutLock, Write},
+  path::Path,
   time::{Duration, Instant},
 };
 
@@ -11,15 +11,16 @@ use crossterm::{
   cursor,
   event::{poll, read, Event, KeyCode},
   queue,
-  style::Color,
+  style::{Color, Print, ResetColor, SetForegroundColor},
   terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
 use robson_compiler::{
   compiler::Compiler, data_struct::IError, interpreter::Interpreter,
   Infra,
 };
-use utils::color_print;
+use utils::{color_print, color_print_no_newline};
 
+use crate::utils::print_err;
 pub struct RunInfra<'a> {
   stdout: StdoutLock<'a>,
 }
@@ -103,12 +104,41 @@ impl<'a> Infra for RunInfra<'a> {
     queue!(self.stdout, cursor::MoveTo(x as u16, y as u16))?;
     Ok(())
   }
+  fn clone_self(&mut self) -> Box<dyn Infra> {
+    Box::new(RunInfra {
+      stdout: stdout().lock(),
+    })
+  }
+  fn color_print(&mut self, string: String, color: u32) {
+    if queue!(
+      self.stdout,
+      SetForegroundColor(Color::AnsiValue(color as u8)),
+      Print(format!("{}", string)),
+      ResetColor
+    )
+    .is_err()
+    {
+      print!("{}", string);
+    }
+  }
 }
+
+fn change_extension(path: String) -> String {
+  let mut new_path = String::new();
+  let splited: Vec<&str> = path.split(".robson").collect();
+  for (i, str) in splited.iter().enumerate() {
+    if i != splited.len() - 1 {
+      new_path.push_str(str);
+    }
+  }
+  new_path.push_str(".rbsn");
+  new_path
+}
+
 fn run_compiled(
   buffer: &[u8],
   debug: bool,
   time: bool,
-  lines: usize,
 ) -> Result<(), IError> {
   let mut interpreter = Interpreter::new(buffer, RunInfra::new())?;
   interpreter.debug(debug);
@@ -131,8 +161,8 @@ fn run_compiled(
 
   if debug {
     print!("[");
-    for i in 0..lines {
-      print!("{}, ", interpreter.memory[i]);
+    for i in interpreter.memory {
+      print!("{}, ", i);
     }
     println!("]");
   }
@@ -145,9 +175,7 @@ fn run_compiled(
   result
 }
 
-fn compile_robson(
-  file_path: String,
-) -> Result<Vec<u8>, Box<dyn Error>> {
+fn compile_robson(file_path: String) -> Result<Vec<u8>, IError> {
   let mut compiler = Compiler::new(file_path, RunInfra::new())?;
   let buffer = compiler.compile()?;
   Ok(buffer)
@@ -167,14 +195,42 @@ fn write_to_file(
   file_path: &str,
 ) -> Result<(), std::io::Error> {
   // CREATE PATH MODEL "out/NAME.rbsn"
-  let mut true_path = String::from("out/");
-  true_path.push_str(&file_path.replace(".robson", ".rbsn"));
+  let file_path = change_extension(file_path.to_owned());
+  let path = Path::new(&file_path);
+
+  let parent = path.parent().ok_or(std::io::Error::new(
+    ErrorKind::NotFound,
+    "Specified path nas no parent",
+  ))?;
+  let true_path = if path.is_absolute() {
+    format!(
+      "{}/out/{}",
+      parent.to_string_lossy(),
+      path
+        .file_name()
+        .ok_or(std::io::Error::new(
+          ErrorKind::InvalidInput,
+          "Expected a file"
+        ))?
+        .to_str()
+        .unwrap()
+    )
+  } else {
+    format!("out/{}", path.to_string_lossy())
+  };
 
   let file = File::create(&true_path);
   if let Err(err) = file {
     // CREATE OUT DIR IF IT DOESNT EXISTS
     if err.kind() == ErrorKind::NotFound {
-      std::fs::create_dir("out/")?;
+      match std::fs::create_dir("out/") {
+        Ok(_) => {}
+        Err(err) => {
+          if err.kind() != ErrorKind::AlreadyExists {
+            return Err(err);
+          }
+        }
+      };
       let mut file = File::create(true_path)?;
       // WRITE THE BINARY
       file.write(buffer)?;
@@ -187,15 +243,13 @@ fn write_to_file(
 }
 
 fn main() {
-  const VERSION: &str = "0.1.2";
-
+  const VERSION: &str = "0.1.3";
   let args = &std::env::args().collect::<Vec<String>>();
   let mut raw_run = true;
   let mut file_path = String::new();
   let mut debug = false;
   let mut run = false;
   let mut compile = false;
-  let mut lines = 0;
   let mut time = false;
   let valid_flags = ["debug", "compile", "run", "time"];
 
@@ -226,29 +280,84 @@ fn main() {
         } else {
           color_print("!Flags other than the first are ignored!\n-----------------", Color::Yellow)
         }
-      } else if debug {
-        lines = match string.parse::<usize>() {
-          Ok(a) => a,
-          Err(_) => {
-            color_print(
-              format!(
-                "!couldnt parse {} into integer!\n-----------------",
-                string
-              ),
-              Color::Yellow,
-            );
-            0
-          }
-        };
       } else {
         warn_flags(string)
       }
     } else if i == 1 {
-      if string.to_lowercase() == "--version" {
-        println!("Robson v{}", VERSION);
-        return;
-      } else {
-        file_path = string.to_owned();
+      match string.to_lowercase().as_str() {
+        "--version" => {
+          const VALID_CHARS: [char; 11] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'];
+          color_print(
+            format!("{}", include_str!("asciilogo")),
+            Color::Magenta,
+          );
+
+          let numbers = vec![
+            include_str!("numbers/0"),
+            include_str!("numbers/1"),
+            include_str!("numbers/2"),
+            include_str!("numbers/3"),
+            include_str!("numbers/4"),
+            include_str!("numbers/5"),
+            include_str!("numbers/6"),
+            include_str!("numbers/7"),
+            include_str!("numbers/8"),
+            include_str!("numbers/9"),
+            include_str!("dot"),
+          ];
+          let mut line_numbers: Vec<Vec<&str>> = Vec::new();
+          for i in numbers {
+            line_numbers.push(i.lines().collect());
+          }
+          println!("");
+          for i in 0..9 {
+            for char in VERSION.chars() {
+              if VALID_CHARS.contains(&char) {
+                let value: usize = match char {
+                  '0' => 0,
+                  '1' => 1,
+                  '2' => 2,
+                  '3' => 3,
+                  '4' => 4,
+                  '5' => 5,
+                  '6' => 6,
+                  '7' => 7,
+                  '8' => 8,
+                  '9' => 9,
+                  _ => 10,
+                };
+
+                color_print_no_newline(
+                  format!("{}  ", line_numbers[value][i]),
+                  Color::Magenta,
+                );
+              }
+            }
+            print!("\n");
+          }
+
+          return;
+        }
+        "--generate" => {
+          let mut string = String::new();
+
+          match stdin().read_line(&mut string) {
+            Ok(_) => {}
+            Err(err) => print_err(err.into()),
+          };
+          let mut chars: Vec<char> = string.chars().collect();
+
+          chars.reverse();
+          println!("robson robson robson");
+          for i in chars {
+            println!("comeu {}", i as u32);
+          }
+          return;
+        }
+        _ => {
+          file_path = string.to_owned();
+        }
       }
     }
   }
@@ -264,26 +373,13 @@ fn main() {
     let buffer = match fs::read(file_path) {
       Ok(a) => a,
       Err(err) => {
-        color_print(
-          format!(
-            "\n--------------------\n{}\n--------------------",
-            err
-          ),
-          Color::Red,
-        );
+        print_err(err.into());
         return;
       }
     };
-    if let Err(err) = run_compiled(&buffer, debug, time, lines) {
-      color_print(
-        format!(
-          "\n--------------------\n{}\n--------------------",
-          err
-        ),
-        Color::Red,
-      );
+    if let Err(err) = run_compiled(&buffer, debug, time) {
+      print_err(err);
     }
-
     return;
   }
   if compile || run || debug {
@@ -301,43 +397,23 @@ fn main() {
     let buffer = match compile_robson(file_path.clone()) {
       Ok(a) => a,
       Err(err) => {
-        color_print(
-          format!(
-            "\n--------------------\n{}\n--------------------",
-            err
-          ),
-          Color::Red,
-        );
+        print_err(err);
         return;
       }
     };
     let elapsed = now.elapsed();
-    color_print(
-      format!("Compiled in {:.2?}", elapsed),
-      Color::DarkGreen,
-    );
+    color_print(format!("Finished in {:.2?}", elapsed), Color::Green);
     //writing to file
     if let Err(err) = write_to_file(&buffer, &file_path) {
-      color_print(
-        format!(
-          "\n--------------------\n{}\n--------------------",
-          err
-        ),
-        Color::Red,
-      );
+      print_err(err.into());
       return;
     }
 
     //Run the compiled binary
     if run || debug {
-      if let Err(err) = run_compiled(&buffer, debug, false, lines) {
-        color_print(
-          format!(
-            "\n--------------------\n{}\n--------------------",
-            err
-          ),
-          Color::Red,
-        );
+      color_print(format!("Running now"), Color::Magenta);
+      if let Err(err) = run_compiled(&buffer, debug, false) {
+        print_err(err)
       }
     }
   }

@@ -13,18 +13,26 @@ pub struct Compiler {
   lines: Vec<String>,
   opcode_params: [u8; 16],
   names: HashMap<String, usize>,
+  files: HashMap<String, usize>,
   pos: usize,
   debug: bool,
+  current_command: usize,
   buffer: Vec<u8>,
   infra: Box<dyn Infra>,
+  is_preload: bool,
+  compiled_stack: Vec<String>,
   last_opcode: u8,
+  offset: usize,
+  inner: usize,
+  path: String,
 }
 impl Compiler {
   pub fn new(
     path: String,
     infra: Box<dyn Infra>,
   ) -> Result<Self, IError> {
-    let file = std::fs::File::options().read(true).open(path)?;
+    let file =
+      std::fs::File::options().read(true).open(path.clone())?;
     let buff_reader = BufReader::new(&file);
     let lines = buff_reader
       .lines()
@@ -35,14 +43,46 @@ impl Compiler {
       debug: false,
       infra,
       last_opcode: 0,
+      offset: 0,
+      files: HashMap::new(),
+      is_preload: false,
       lines,
+      current_command: 0,
       names: HashMap::new(),
+      compiled_stack: Vec::new(),
       opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 1, 0, 1],
       pos: 0,
+      path,
+      inner: 0,
     })
   }
+  pub fn inner_in(&mut self, current: usize) {
+    self.inner = current + 1;
+    // println!("{}", current + 1);
+  }
+  pub fn compiled_stack(
+    &mut self,
+    current: Vec<String>,
+    new_path: &str,
+  ) -> Result<(), IError> {
+    self.compiled_stack = current;
+    if self.compiled_stack.contains(&new_path.to_owned()) {
+      return Err(IError::message("Creating infinite compilation"));
+    } else {
+      self.compiled_stack.push(new_path.to_owned());
+      Ok(())
+    }
+  }
+  pub fn set_offset(&mut self, offset: usize) {
+    self.offset = offset;
+  }
+  pub fn set_preload(&mut self, new_preload: bool) {
+    self.is_preload = new_preload;
+  }
   pub fn compile(&mut self) -> Result<Vec<u8>, IError> {
-    self.start_command_alias();
+    if let Some(err) = self.start_command_alias() {
+      return Err(err);
+    }
     loop {
       if self.verify_index_overflow(self.pos) {
         break;
@@ -60,6 +100,61 @@ impl Compiler {
 
       // //skip spaces
       if string.is_empty() {
+        self.pos += 1;
+        continue;
+      }
+
+      // implement multiple module instructions
+      if string.contains("robsons") {
+        let splited: Vec<&str> = string.split(' ').collect();
+        if splited.len() != 2 {
+          return Err(IError::message("Malformated robsons"));
+        }
+        let file_path = splited[1];
+        let mut inner_spaces = String::from("");
+        if self.inner > 0 {
+          if self.inner > 1 {
+            for _i in 0..self.inner {
+              inner_spaces.push_str("  ");
+            }
+          }
+          inner_spaces.push_str(" +->");
+        }
+        if !self.is_preload {
+          self.infra.color_print(inner_spaces, 40);
+          self.infra.color_print(
+            format!(" Compiling {file_path}\n"),
+            match self.inner {
+              0 => 2,
+              _ => 2,
+            },
+          );
+        }
+        let mut compiler = match Compiler::new(
+          file_path.to_owned(),
+          self.infra.clone_self(),
+        ) {
+          Ok(a) => a,
+          Err(err) => {
+            if err.to_string().contains("os error 2") {
+              return Err(IError::message(format!(
+                "No such file '{}' (os error 2)",
+                file_path
+              )));
+            } else {
+              return Err(err);
+            }
+          }
+        };
+        compiler.set_preload(self.is_preload);
+        compiler.inner_in(self.inner);
+        compiler.set_offset(self.current_command + self.offset);
+        let buffer = compiler.compile()?;
+        self.current_command += buffer.len() / 15;
+        for i in buffer {
+          self.buffer.push(i);
+        }
+        self.last_opcode = 0;
         self.pos += 1;
         continue;
       }
@@ -84,7 +179,7 @@ impl Compiler {
       for i in spaces {
         if i != "robson" {
           return Err(IError::message(format!(
-            "invalid token for opcode in line {}, '{}'",
+            "Invalid token for opcode in line {}, '{}'",
             self.pos + 1,
             i
           )));
@@ -139,6 +234,7 @@ impl Compiler {
       }
       if string.contains(':') {
         //add alias if it is an alias
+
         if string.ends_with(':') {
           let value = string.trim().replace(':', "");
           if self.names.get(&value).is_some() {
@@ -150,11 +246,63 @@ impl Compiler {
           if self.debug {
             self.infra.println(format!("{}: {}", value, pos + 1));
           }
-          self.names.insert(value, command_number);
+          self.names.insert(value, command_number + self.offset);
         }
       } else {
-        //if is not an alias add the command
-        if string.contains("robson") {
+        //if is not an check what it is
+        if string.contains("robsons") {
+          //if is an include compile the include to get the correct value of the aliases
+          let splited: Vec<&str> = string.split(' ').collect();
+          if splited.len() != 2 {
+            return Some(IError::message(IError::message(
+              "malformated robsons",
+            )));
+          }
+          let path = splited[1];
+          let new_offset = match self.files.get(path) {
+            Some(a) => *a,
+            None => {
+              let mut compiler = match Compiler::new(
+                path.to_owned(),
+                self.infra.clone_self(),
+              ) {
+                Ok(a) => a,
+                Err(err) => {
+                  if err.to_string().contains("os error 2") {
+                    return Some(IError::message(format!(
+                      "No such file '{}' (os error 2)",
+                      path
+                    )));
+                  } else {
+                    return Some(err);
+                  }
+                }
+              };
+              self
+                .infra
+                .color_print(format!("Preloading {path}\n"), 14);
+              compiler.set_offset(command_number);
+              compiler.set_preload(true);
+              compiler.inner_in(self.inner);
+              if let Err(err) = compiler.compiled_stack(
+                self.compiled_stack.clone(),
+                &self.path,
+              ) {
+                return Some(err);
+              }
+              self
+                .files
+                .insert(path.to_owned(), compiler.current_command);
+              match compiler.compile() {
+                Ok(_) => compiler.current_command,
+                Err(err) => return Some(err),
+              }
+            }
+          };
+
+          command_number += new_offset;
+        } else if string.contains("robson") {
+          // if is a command just add it
           command_number += 1;
           let mut opcode: u8 = 0;
           let spaces: Vec<&str> = string.split(' ').collect();
@@ -197,6 +345,7 @@ impl Compiler {
     opcode: u8,
     params: [String; 3],
   ) -> Result<(), IError> {
+    // if !self.is_preload {
     self.buffer.push(opcode);
     let (param1, param1_kind, param1_types) =
       self.get_kind_value(params[0].trim())?;
@@ -232,6 +381,8 @@ impl Compiler {
       param3_types,
       0,
     ));
+    // }
+    self.current_command += 1;
     Ok(())
   }
   pub fn get_kind_value(
@@ -245,7 +396,7 @@ impl Compiler {
 
     if splited.len() < 2 {
       return Err(IError::message(format!(
-        "malformated param at {}",
+        "Malformated param at line {}",
         self.pos
       )));
     }
@@ -294,7 +445,7 @@ impl Compiler {
       }
       token => {
         return Err(IError::message(format!(
-          "unexpected token in command of line {}, '{}'",
+          "Unexpect token for param at line {}, '{}'",
           self.pos, token
         )))
       }

@@ -25,6 +25,8 @@ pub trait Infra {
   fn hide_cursor(&mut self) -> Result<(), IError>;
   fn show_cursor(&mut self) -> Result<(), IError>;
   fn move_cursor(&mut self, x: u32, y: u32) -> Result<(), IError>;
+  fn clone_self(&mut self) -> Box<dyn Infra>;
+  fn color_print(&mut self, to_print: String, color: u32);
 }
 
 pub fn print_file_buffer(buffer: Vec<u8>) {

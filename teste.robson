@@ -1,73 +1,12 @@
 robson robson robson
 comeu 10
-comeu 41
-comeu 58
-comeu 32
-comeu 117
-comeu 97
-comeu 112
+comeu 65
+comeu 65
+comeu 65
+comeu 65
+comeu 65
+comeu 65
+comeu 65
+comeu 65
 
-robson robson robson robson robson robson robson robson robson robson
-comeu 0
-robson robson robson robson robson robson robson robson robson robson
-comeu 1
-robson robson robson robson robson robson robson robson robson robson
-comeu 2
-robson robson robson robson robson robson robson robson robson robson
-comeu 3
-robson robson robson robson robson robson robson robson robson robson
-comeu 4
-robson robson robson robson robson robson robson robson robson robson
-comeu 5
-robson robson robson robson robson robson robson robson robson robson
-comeu 6
-
-robson robson robson
-comeu 500
-comeu 0
-
-; SET TIMEOUT
-robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 1
-
-print:
-robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 0
-
-; START TIMOUT LOOP
-
-loop_till_interval:
-robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 2
-
-robson robson
-chupou 0
-comeu 1
-lambeu :loop_till_interval
-
-; END TIMEOUT LOOP
-
-robson robson robson
-penetrou 30
-
-robson robson robson robson robson robson robson
-
-robson robson robson robson robson robson robson robson robson robson robson robson robson robson
-
-robson
-comeu 0
-fudeu 30
-comeu 1
-
-robson robson robson robson robson robson robson robson robson robson
-comeu 30
-
-robson robson robson robson
-penetrou 30
-comeu 0
-lambeu :end
-
-robson robson robson robson robson robson robson robson robson
-lambeu :print
-
-end:
+robsons print.robson

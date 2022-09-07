@@ -1,3 +1,5 @@
+use std::io::stdout;
+
 use crate::{compiler::Compiler, interpreter::Interpreter, Infra};
 
 pub struct TestInfra {
@@ -27,6 +29,54 @@ impl Infra for TestInfra {
       .map(|a| format!("{}\n", a))
       .collect();
     Ok(split[0].to_owned())
+  }
+  fn clear_all(&mut self) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn clear_purge(
+    &mut self,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn disable_raw_mode(
+    &self,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn enable_raw_mode(
+    &self,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn flush(&mut self) {}
+  fn hide_cursor(
+    &mut self,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn move_cursor(
+    &mut self,
+    _x: u32,
+    _y: u32,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn poll(
+    &self,
+    _duration: u64,
+  ) -> Result<u32, crate::data_struct::IError> {
+    Ok(0)
+  }
+  fn show_cursor(
+    &mut self,
+  ) -> Result<(), crate::data_struct::IError> {
+    Ok(())
+  }
+  fn clone_self(&mut self) -> Box<dyn Infra> {
+    Box::new(TestInfra {
+      stdout: self.stdout.clone(),
+      stdin: self.stdout.clone(),
+    })
   }
 }
 
