@@ -89,13 +89,15 @@ impl Display for TypedByte {
       match self.r#type {
         Type::Usigned =>
           format!("{}", u32::from_be_bytes(self.value)),
-        Type::Signed => format!("{}", i32::from_be_bytes(self.value)),
+        Type::Signed =>
+          format!("i{}", i32::from_be_bytes(self.value)),
         Type::Floating =>
-          format!("{}", f32::from_be_bytes(self.value)),
+          format!("f{}", f32::from_be_bytes(self.value)),
       }
     )
   }
 }
+
 impl TypedByte {
   pub fn force_u32(
     &self,
@@ -107,6 +109,37 @@ impl TypedByte {
       )));
     }
     Ok(u32::from_be_bytes(self.value))
+  }
+  pub fn convert(self, to_convert: Type) -> TypedByte {
+    match to_convert {
+      Type::Usigned => match self.r#type {
+        Type::Floating => {
+          (f32::from_be_bytes(self.value) as u32).into()
+        }
+        Type::Signed => {
+          (i32::from_be_bytes(self.value) as u32).into()
+        }
+        Type::Usigned => self,
+      },
+      Type::Signed => match self.r#type {
+        Type::Floating => {
+          (f32::from_be_bytes(self.value) as i32).into()
+        }
+        Type::Signed => self,
+        Type::Usigned => {
+          (u32::from_be_bytes(self.value) as i32).into()
+        }
+      },
+      Type::Floating => match self.r#type {
+        Type::Floating => self,
+        Type::Signed => {
+          (i32::from_be_bytes(self.value) as f32).into()
+        }
+        Type::Usigned => {
+          (u32::from_be_bytes(self.value) as f32).into()
+        }
+      },
+    }
   }
 }
 

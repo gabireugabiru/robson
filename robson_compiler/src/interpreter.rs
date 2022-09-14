@@ -3,9 +3,13 @@ use std::{
   time::{Duration, Instant},
 };
 
+use rand::Rng;
+
 use crate::{
   data_struct::{IError, Stack, Type, TypedByte},
-  utils::convert_kind_byte,
+  utils::{
+    convert_kind_byte, convert_two_bits, f32_mod, i32_mod, u32_mod,
+  },
   Infra,
 };
 
@@ -26,9 +30,9 @@ pub struct Interpreter<'a> {
   buffer: &'a [u8],
   opcode_functions: [fn(
     &mut Interpreter,
-    params: [(TypedByte, usize); 3],
-  ) -> Result<(), IError>; 16],
-  operations: [[fn(&mut Interpreter, (TypedByte, TypedByte)); 3]; 4],
+    params: [(TypedByte, usize, bool); 3],
+  ) -> Result<(), IError>; 17],
+  operations: [[fn(&mut Interpreter, (TypedByte, TypedByte)); 3]; 5],
   convertion_array:
     [fn(TypedByte, &mut Interpreter) -> Result<TypedByte, IError>; 4],
   #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
@@ -82,7 +86,7 @@ fn convert_penetrou(
 }
 fn do_no_shit(
   _: &mut Interpreter,
-  _: [(TypedByte, usize); 3],
+  _: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   Ok(())
 }
@@ -90,13 +94,27 @@ fn do_no_shit(
 #[inline(always)]
 fn operations(
   interpreter: &mut Interpreter,
-  [param1, param2, param3]: [(TypedByte, usize); 3],
+  [param1, param2, param3]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let kind = interpreter
     .convert(param1.0, param1.1)?
     .force_u32(interpreter.current_command)?;
   let value = interpreter.convert(param2.0, param2.1)?;
   let value2 = interpreter.convert(param3.0, param3.1)?;
+  if param2.2 {
+    interpreter.operations[kind as usize][value2.r#type as usize](
+      interpreter,
+      (value.convert(value2.r#type), value2),
+    );
+    return Ok(());
+  }
+  if param3.2 {
+    interpreter.operations[kind as usize][value.r#type as usize](
+      interpreter,
+      (value, value2.convert(value.r#type)),
+    );
+    return Ok(());
+  }
   if value.r#type != value2.r#type {
     return Err(IError::message(format!(
       "Adding with incompatible types at command {}",
@@ -114,7 +132,7 @@ fn operations(
 #[inline(always)]
 fn if_lower(
   interpreter: &mut Interpreter,
-  [param1, param2, param3]: [(TypedByte, usize); 3],
+  [param1, param2, param3]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let value = interpreter.convert(param1.0, param1.1)?;
   let value2 = interpreter.convert(param2.0, param2.1)?;
@@ -136,7 +154,7 @@ fn if_lower(
 //OPCODE 3
 fn push_stack(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let value = interpreter.convert(param1.0, param1.1)?;
   interpreter.stack.push(value);
@@ -146,7 +164,7 @@ fn push_stack(
 //OPCODE 4
 fn if_true_jump(
   interpreter: &mut Interpreter,
-  [param1, param2, param3]: [(TypedByte, usize); 3],
+  [param1, param2, param3]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let value = interpreter.convert(param1.0, param1.1)?;
   let value2 = interpreter.convert(param2.0, param2.1)?;
@@ -174,7 +192,7 @@ fn if_true_jump(
 #[inline(always)]
 fn vstack_jump(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let value = interpreter
     .convert(param1.0, param1.1)?
@@ -189,7 +207,7 @@ fn vstack_jump(
 #[inline(always)]
 fn input(
   interpreter: &mut Interpreter,
-  [param1, param2, param3]: [(TypedByte, usize); 3],
+  [param1, param2, param3]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let mut value = interpreter
     .convert(param1.0, param1.1)?
@@ -241,7 +259,7 @@ fn input(
 #[inline(always)]
 fn print(
   interpreter: &mut Interpreter,
-  [..]: [(TypedByte, usize); 3],
+  [..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   if interpreter.stack.is_empty() {
     return Err(IError::message(format!(
@@ -268,7 +286,7 @@ fn print(
 #[inline(always)]
 fn printnumber(
   interpreter: &mut Interpreter,
-  [..]: [(TypedByte, usize); 3],
+  [..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let TypedByte { value, r#type } = interpreter.stack.top()?;
 
@@ -292,7 +310,7 @@ fn printnumber(
 #[inline(always)]
 fn jump(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let value = interpreter
     .convert(param1.0, param1.1)?
@@ -305,7 +323,7 @@ fn jump(
 #[inline(always)]
 fn set(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let address = interpreter
     .convert(param1.0, param1.1)?
@@ -322,7 +340,7 @@ fn set(
 #[inline(always)]
 fn pop_stack(
   interpreter: &mut Interpreter,
-  [..]: [(TypedByte, usize); 3],
+  [..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   if !interpreter.stack.is_empty() {
     interpreter.stack.pop();
@@ -334,7 +352,7 @@ fn pop_stack(
 #[inline(always)]
 fn load_string(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   let mut value = interpreter
     .convert(param1.0, param1.1)?
@@ -343,6 +361,9 @@ fn load_string(
   let mut buffer: Vec<u32> = Vec::new();
   interpreter.validate_until(value + 5);
   loop {
+    if value == interpreter.memory.len() {
+      break;
+    }
     let temp = u32::from_be_bytes(*interpreter.memory[value]);
     if temp != 0 {
       buffer.push(temp);
@@ -362,9 +383,10 @@ fn load_string(
 }
 
 //OPCODE 13
+#[inline(always)]
 fn time_operations(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   match interpreter
     .convert(param1.0, param1.1)?
@@ -404,17 +426,19 @@ fn time_operations(
   Ok(())
 }
 //OPCODE 14
+#[inline(always)]
 fn flush(
   interpreter: &mut Interpreter,
-  _: [(TypedByte, usize); 3],
+  _: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   interpreter.infra.flush();
   Ok(())
 }
 //OPCODE 15
+#[inline(always)]
 fn terminal_commands(
   interpreter: &mut Interpreter,
-  [param1, ..]: [(TypedByte, usize); 3],
+  [param1, ..]: [(TypedByte, usize, bool); 3],
 ) -> Result<(), IError> {
   match interpreter
     .convert(param1.0, param1.1)?
@@ -426,6 +450,7 @@ fn terminal_commands(
         .stack
         .top()?
         .force_u32(interpreter.current_command)?;
+      interpreter.stack.pop();
       if on_off == 0 {
         interpreter.infra.disable_raw_mode()?;
       } else {
@@ -438,6 +463,7 @@ fn terminal_commands(
         .stack
         .top()?
         .force_u32(interpreter.current_command)?;
+      interpreter.stack.pop();
       if r#type == 0 {
         interpreter.infra.clear_purge()?;
       } else {
@@ -449,6 +475,7 @@ fn terminal_commands(
       let a = interpreter.stack.top()?.value;
       interpreter.stack.pop();
       let b = interpreter.stack.top()?.value;
+      interpreter.stack.pop();
       let result = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
       let value =
         interpreter.infra.poll(u64::from_be_bytes(result))?;
@@ -460,6 +487,7 @@ fn terminal_commands(
         .stack
         .top()?
         .force_u32(interpreter.current_command)?;
+      interpreter.stack.pop();
       if on_off == 0 {
         interpreter.infra.hide_cursor()?;
       } else {
@@ -472,14 +500,24 @@ fn terminal_commands(
         .stack
         .top()?
         .force_u32(interpreter.current_command)?;
+      interpreter.stack.pop();
       let y = interpreter
         .stack
         .top()?
         .force_u32(interpreter.current_command)?;
+      interpreter.stack.pop();
       interpreter.infra.move_cursor(x, y)?;
     }
     _ => {}
   }
+  Ok(())
+}
+fn random(
+  interpreter: &mut Interpreter,
+  _: [(TypedByte, usize, bool); 3],
+) -> Result<(), IError> {
+  let mut rng = rand::thread_rng();
+  interpreter.stack.push(rng.gen::<f32>().into());
   Ok(())
 }
 
@@ -515,6 +553,7 @@ impl<'a> Interpreter<'a> {
         time_operations,
         flush,
         terminal_commands,
+        random,
       ],
       convertion_array: [
         not_convert,
@@ -543,6 +582,11 @@ impl<'a> Interpreter<'a> {
           |int, (v1, v2)| int.stack.push(i32_div(*v1, *v2).into()),
           |int, (v1, v2)| int.stack.push(f32_div(*v1, *v2).into()),
         ],
+        [
+          |int, (v1, v2)| int.stack.push(u32_mod(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(i32_mod(*v1, *v2).into()),
+          |int, (v1, v2)| int.stack.push(f32_mod(*v1, *v2).into()),
+        ],
       ],
       #[cfg(any(target_arch = "wasm32", target_arch = "wasm64"))]
       used_input: -1,
@@ -552,62 +596,68 @@ impl<'a> Interpreter<'a> {
     self.debug = new;
   }
 
-  pub fn run_buffer(&mut self) -> Result<bool, IError> {
-    let opcode = self.buffer[self.index];
-    let kind_byte = self.buffer[self.index + 1];
-    let param1_byte = [
-      self.buffer[self.index + 2],
-      self.buffer[self.index + 3],
-      self.buffer[self.index + 4],
-      self.buffer[self.index + 5],
-    ];
-    let param2_byte = [
-      self.buffer[self.index + 6],
-      self.buffer[self.index + 7],
-      self.buffer[self.index + 8],
-      self.buffer[self.index + 9],
-    ];
-    let param3_byte = [
-      self.buffer[self.index + 10],
-      self.buffer[self.index + 11],
-      self.buffer[self.index + 12],
-      self.buffer[self.index + 13],
-    ];
+  pub fn run_buffer(&mut self) -> Result<(), IError> {
+    loop {
+      let opcode = self.buffer[self.index];
+      let kind_byte = self.buffer[self.index + 1];
+      let param1_byte = [
+        self.buffer[self.index + 2],
+        self.buffer[self.index + 3],
+        self.buffer[self.index + 4],
+        self.buffer[self.index + 5],
+      ];
+      let param2_byte = [
+        self.buffer[self.index + 6],
+        self.buffer[self.index + 7],
+        self.buffer[self.index + 8],
+        self.buffer[self.index + 9],
+      ];
+      let param3_byte = [
+        self.buffer[self.index + 10],
+        self.buffer[self.index + 11],
+        self.buffer[self.index + 12],
+        self.buffer[self.index + 13],
+      ];
 
-    let types = self.buffer[self.index + 14];
-    let converted_types = convert_kind_byte(types);
-    let converted_kind = convert_kind_byte(kind_byte);
+      let types = self.buffer[self.index + 14];
+      let converted_types = convert_kind_byte(types);
+      let converted_kind = convert_kind_byte(kind_byte);
 
-    let param1 = TypedByte {
-      value: param1_byte,
-      r#type: Type::from(converted_types[0]),
-    };
-    let param2 = TypedByte {
-      value: param2_byte,
-      r#type: Type::from(converted_types[1]),
-    };
-    let param3 = TypedByte {
-      value: param3_byte,
-      r#type: Type::from(converted_types[2]),
-    };
-    if self.debug {
-      let command = self.current_command;
-      println!("\ncommand: {command}\nopcode: {opcode}\ntypes_byte: {types:08b}\nkind_byte: {kind_byte:08b}\nparam1: {param1}\nparam2: {param2}\nparam3: {param3}\nstack: {}", self.stack);
+      let param1 = TypedByte {
+        value: param1_byte,
+        r#type: Type::from(converted_types[0]),
+      };
+      let param2 = TypedByte {
+        value: param2_byte,
+        r#type: Type::from(converted_types[1]),
+      };
+      let param3 = TypedByte {
+        value: param3_byte,
+        r#type: Type::from(converted_types[2]),
+      };
+
+      let [param1_convert, param2_convert] =
+        convert_two_bits(converted_kind[3] as u8);
+      let [param3_convert, _] =
+        convert_two_bits(converted_types[3] as u8);
+      if self.debug {
+        let command = self.current_command;
+        println!("\ncommand: {command}\nopcode: {opcode}\ntypes_byte: {types:08b}\nkind_byte: {kind_byte:08b}\nparam1: {param1}\nparam2: {param2}\nparam3: {param3}\nstack: {}", self.stack);
+      }
+
+      self.index += 15;
+      self.execute_command(
+        opcode,
+        (param1, converted_kind[0], param1_convert),
+        (param2, converted_kind[1], param2_convert),
+        (param3, converted_kind[2], param3_convert),
+      )?;
+      self.current_command = self.index / 15;
+      if self.index >= self.buffer.len() {
+        break;
+      }
     }
-
-    self.index += 15;
-    self.execute_command(
-      opcode,
-      (param1, converted_kind[0]),
-      (param2, converted_kind[1]),
-      (param3, converted_kind[2]),
-    )?;
-    self.current_command = self.index / 15;
-    if self.index < self.buffer.len() {
-      Ok(false)
-    } else {
-      Ok(true)
-    }
+    Ok(())
   }
   pub fn validate_until(&mut self, address: usize) {
     if self.memory.len() <= address {
@@ -627,9 +677,9 @@ impl<'a> Interpreter<'a> {
   pub fn execute_command(
     &mut self,
     opcode: u8,
-    param1: (TypedByte, usize),
-    param2: (TypedByte, usize),
-    param3: (TypedByte, usize),
+    param1: (TypedByte, usize, bool),
+    param2: (TypedByte, usize, bool),
+    param3: (TypedByte, usize, bool),
   ) -> Result<(), IError> {
     self.opcode_functions[opcode as usize](
       self,

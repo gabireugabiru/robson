@@ -1,5 +1,3 @@
-use std::io::stdout;
-
 use crate::{compiler::Compiler, interpreter::Interpreter, Infra};
 
 pub struct TestInfra {
@@ -77,6 +75,9 @@ impl Infra for TestInfra {
       stdout: self.stdout.clone(),
       stdin: self.stdout.clone(),
     })
+  }
+  fn color_print(&mut self, to_print: String, _color: u32) {
+    self.print(to_print)
   }
 }
 
@@ -171,6 +172,20 @@ fn operations() {
 fn types() {
   let mut compiler = Compiler::new(
     "tests/types.robson".to_owned(),
+    TestInfra::new("".to_owned()),
+  )
+  .unwrap();
+  let compiled = compiler.compile().unwrap();
+  let mut interpreter =
+    Interpreter::new(&compiled, TestInfra::new(String::new()))
+      .unwrap();
+  while !interpreter.run_buffer().unwrap() {}
+}
+
+#[test]
+fn include() {
+  let mut compiler = Compiler::new(
+    "tests/include.robson".to_owned(),
     TestInfra::new("".to_owned()),
   )
   .unwrap();

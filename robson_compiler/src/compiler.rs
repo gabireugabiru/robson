@@ -5,13 +5,13 @@ use std::{
 
 use crate::{
   data_struct::{IError, TypedByte},
-  utils::{self, create_kind_byte},
+  utils::{self, create_kind_byte, create_two_bits},
   Infra,
 };
 
 pub struct Compiler {
   lines: Vec<String>,
-  opcode_params: [u8; 16],
+  opcode_params: [u8; 17],
   names: HashMap<String, usize>,
   files: HashMap<String, usize>,
   pos: usize,
@@ -50,7 +50,9 @@ impl Compiler {
       current_command: 0,
       names: HashMap::new(),
       compiled_stack: Vec::new(),
-      opcode_params: [0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 1, 0, 1],
+      opcode_params: [
+        0, 3, 3, 1, 3, 1, 3, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0,
+      ],
       pos: 0,
       path,
       inner: 0,
@@ -59,6 +61,12 @@ impl Compiler {
   pub fn inner_in(&mut self, current: usize) {
     self.inner = current + 1;
     // println!("{}", current + 1);
+  }
+  pub fn set_files(
+    &mut self,
+    new_compiled_files: HashMap<String, usize>,
+  ) {
+    self.files = new_compiled_files;
   }
   pub fn compiled_stack(
     &mut self,
@@ -146,6 +154,7 @@ impl Compiler {
             }
           }
         };
+        compiler.set_files(self.files.clone());
         compiler.set_preload(self.is_preload);
         compiler.inner_in(self.inner);
         compiler.set_offset(self.current_command + self.offset);
@@ -220,6 +229,58 @@ impl Compiler {
     }
     Ok(self.buffer.clone())
   }
+
+  pub fn get_cached_robsons_size(
+    &mut self,
+    path: &str,
+    command_number: usize,
+  ) -> Result<usize, IError> {
+    match self.files.get(path) {
+      Some(a) => Ok(*a),
+      None => {
+        // compile file and cache it
+        let mut compiler = match Compiler::new(
+          path.to_owned(),
+          self.infra.clone_self(),
+        ) {
+          Ok(a) => a,
+          Err(err) => {
+            if err.to_string().contains("os error 2") {
+              return Err(IError::message(format!(
+                "No such file '{}' (os error 2)",
+                path
+              )));
+            } else {
+              return Err(err);
+            }
+          }
+        };
+        self.infra.color_print(format!("Preloading {path}\n"), 14);
+        compiler.set_offset(command_number);
+        compiler.set_preload(true);
+        compiler.inner_in(self.inner);
+        compiler.set_files(self.files.clone());
+        if let Err(err) = compiler
+          .compiled_stack(self.compiled_stack.clone(), &self.path)
+        {
+          return Err(err);
+        }
+
+        match compiler.compile() {
+          Ok(_) => {
+            // inherit the compiled files
+            self.files = compiler.files.clone();
+            self
+              .files
+              .insert(path.to_owned(), compiler.current_command);
+            Ok(compiler.current_command)
+          }
+          Err(err) => return Err(err),
+        }
+      }
+    }
+  }
+
   pub fn start_command_alias(&mut self) -> Option<IError> {
     struct LastCommand {
       value: u8,
@@ -227,7 +288,7 @@ impl Compiler {
     }
     let mut command_number = 0;
     let mut last_command = LastCommand { pos: 0, value: 0 };
-    for (pos, i) in self.lines.iter().enumerate() {
+    for (pos, i) in self.lines.clone().iter().enumerate() {
       let string = Self::remove_comments(i).trim().to_owned();
       if string.is_empty() {
         continue;
@@ -250,7 +311,7 @@ impl Compiler {
         }
       } else {
         //if is not an check what it is
-        if string.contains("robsons") {
+        if string.starts_with("robsons") {
           //if is an include compile the include to get the correct value of the aliases
           let splited: Vec<&str> = string.split(' ').collect();
           if splited.len() != 2 {
@@ -259,49 +320,17 @@ impl Compiler {
             )));
           }
           let path = splited[1];
-          let new_offset = match self.files.get(path) {
-            Some(a) => *a,
-            None => {
-              let mut compiler = match Compiler::new(
-                path.to_owned(),
-                self.infra.clone_self(),
-              ) {
-                Ok(a) => a,
-                Err(err) => {
-                  if err.to_string().contains("os error 2") {
-                    return Some(IError::message(format!(
-                      "No such file '{}' (os error 2)",
-                      path
-                    )));
-                  } else {
-                    return Some(err);
-                  }
-                }
-              };
-              self
-                .infra
-                .color_print(format!("Preloading {path}\n"), 14);
-              compiler.set_offset(command_number);
-              compiler.set_preload(true);
-              compiler.inner_in(self.inner);
-              if let Err(err) = compiler.compiled_stack(
-                self.compiled_stack.clone(),
-                &self.path,
-              ) {
-                return Some(err);
-              }
-              self
-                .files
-                .insert(path.to_owned(), compiler.current_command);
-              match compiler.compile() {
-                Ok(_) => compiler.current_command,
-                Err(err) => return Some(err),
-              }
-            }
+
+          // get offset from cache if possible
+          let new_offset = match self
+            .get_cached_robsons_size(path, command_number)
+          {
+            Ok(a) => a,
+            Err(err) => return Some(err),
           };
 
           command_number += new_offset;
-        } else if string.contains("robson") {
+        } else if string.starts_with("robson") {
           // if is a command just add it
           command_number += 1;
           let mut opcode: u8 = 0;
@@ -337,6 +366,12 @@ impl Compiler {
     }
     res
   }
+
+  // pub fn get_convert_bits(&self, deez_nuts: String) -> [u8; 2] {
+  //   let splited: Vec<&str> = deez_nuts.split(' ').collect();
+  //   if splited.len() != 3 {}
+  // }
+
   fn verify_index_overflow(&self, pos: usize) -> bool {
     self.lines.len() <= pos
   }
@@ -345,17 +380,17 @@ impl Compiler {
     opcode: u8,
     params: [String; 3],
   ) -> Result<(), IError> {
-    // if !self.is_preload {
     self.buffer.push(opcode);
-    let (param1, param1_kind, param1_types) =
+
+    let (param1, param1_kind, param1_types, param1_convert) =
       self.get_kind_value(params[0].trim())?;
     let param1 = param1.value;
 
-    let (param2, param2_kind, param2_types) =
+    let (param2, param2_kind, param2_types, param2_convert) =
       self.get_kind_value(params[1].trim())?;
     let param2 = param2.value;
 
-    let (param3, param3_kind, param3_types) =
+    let (param3, param3_kind, param3_types, param3_convert) =
       self.get_kind_value(params[2].trim())?;
     let param3 = param3.value;
 
@@ -363,7 +398,7 @@ impl Compiler {
       param1_kind,
       param2_kind,
       param3_kind,
-      0,
+      create_two_bits([param1_convert, param2_convert]),
     ));
 
     for i in param1 {
@@ -379,7 +414,7 @@ impl Compiler {
       param1_types,
       param2_types,
       param3_types,
-      0,
+      create_two_bits([param3_convert, false]),
     ));
     // }
     self.current_command += 1;
@@ -388,9 +423,9 @@ impl Compiler {
   pub fn get_kind_value(
     &self,
     parameter: &str,
-  ) -> Result<(TypedByte, u8, u8), IError> {
+  ) -> Result<(TypedByte, u8, u8, bool), IError> {
     if parameter.is_empty() {
-      return Ok((0u32.into(), 0, 0));
+      return Ok((0u32.into(), 0, 0, false));
     }
     let splited: Vec<&str> = parameter.split(' ').collect();
 
@@ -400,6 +435,18 @@ impl Compiler {
         self.pos
       )));
     }
+    let mut convert = false;
+    if splited.len() == 3 {
+      if splited[2] == "robson" {
+        convert = true;
+      } else {
+        return Err(IError::message(format!(
+          "Malformated param at line {}, expected 'robson'",
+          self.pos
+        )));
+      }
+    }
+
     match splited[0] {
       "comeu" => {
         let mut value = splited[1].trim().to_owned();
@@ -407,22 +454,27 @@ impl Compiler {
         match first {
           'f' => {
             value = value.replace('f', "");
-            Ok((value.parse::<f32>()?.into(), 0, 2))
+            Ok((value.parse::<f32>()?.into(), 0, 2, convert))
           }
           'i' => {
             value = value.replace('i', "");
-            Ok((value.parse::<i32>()?.into(), 0, 1))
+            Ok((value.parse::<i32>()?.into(), 0, 1, convert))
           }
-          _ => Ok((splited[1].trim().parse::<u32>()?.into(), 0, 0)),
+          _ => Ok((
+            splited[1].trim().parse::<u32>()?.into(),
+            0,
+            0,
+            convert,
+          )),
         }
       }
       "chupou" => {
         let value = splited[1].parse::<u32>()?;
-        Ok((value.into(), 1, 0))
+        Ok((value.into(), 1, 0, convert))
       }
       "fudeu" => {
         let value = splited[1].trim().parse::<u32>()?;
-        Ok((value.into(), 2, 0))
+        Ok((value.into(), 2, 0, convert))
       }
       "lambeu" => {
         let value = splited[1].trim();
@@ -437,11 +489,11 @@ impl Compiler {
         let a = self.names.get(&value).ok_or_else(|| {
           IError::message(format!("cant find {}", value))
         })?;
-        Ok(((*a as u32).into(), 0, 0))
+        Ok(((*a as u32).into(), 0, 0, convert))
       }
       "penetrou" => {
         let value = splited[1].trim().parse::<u32>()?;
-        Ok((value.into(), 3, 0))
+        Ok((value.into(), 3, 0, convert))
       }
       token => {
         return Err(IError::message(format!(

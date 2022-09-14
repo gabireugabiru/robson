@@ -1,5 +1,3 @@
-; ADDRESS 2 = FORWARDING ADDRESS
-
 ; SET TIMEOUT
 robson robson robson
 comeu 100
@@ -134,17 +132,81 @@ update:
     comeu 32
     comeu 32
     comeu 32
+    comeu 32
+    comeu 32
+
 
     robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
     robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+
 
     robson robson robson
     fudeu 5
 
     robson robson robson robson robson robson robson
+
+    robson robson robson
+    comeu 13
+    comeu 10
+    comeu 32
+    comeu 32
+    comeu 32
+    comeu 32
+
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+
+
+    robson robson robson
+    comeu 10
+    comeu 84
+    comeu 73
+    comeu 88
+    comeu 69
+    comeu 32
+    comeu 79
+    comeu 84
+    comeu 32
+    comeu 67
+    comeu 83
+    comeu 69
+    comeu 32
+    comeu 83
+    comeu 83
+    comeu 69
+    comeu 82
+    comeu 80
+
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+    robson robson robson robson robson robson robson
+
+
+
 
     ; FLUSH CHANGES
     robson robson robson robson robson robson robson robson robson robson robson robson robson robson
@@ -158,11 +220,23 @@ update:
 ; !!!!!!!!!!!!!!
 
 end: 
+
+; FULL CLEAR CLEAR THE SCREEN
+robson robson robson
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 1
+robson robson robson
+comeu 0
+comeu 0
+robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
+comeu 4
+
 ; SHOW CURSOR AGAIN
 robson robson robson
 comeu 1
 robson robson robson robson robson robson robson robson robson robson robson robson robson robson robson
-comeu 3
+comeu 3 
 ; CLEAR
 robson robson robson
 comeu 1

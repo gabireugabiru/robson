@@ -8,8 +8,10 @@ use crate::{
 pub mod compiler;
 pub mod data_struct;
 pub mod interpreter;
+
 #[cfg(test)]
 mod tests;
+
 mod utils;
 
 pub trait Infra {
@@ -69,7 +71,7 @@ pub fn print_file_buffer(buffer: Vec<u8>) {
       r#type: Type::from(converted_types[2]),
     };
 
-    println!("command: {command}\nopcode: {opcode}\ntypes_byte: {types}\nkind_byte: {kind_byte:08b}\nparam1: {param1:?}\nparam2: {param2:?}\nparam3: {param3:?}\n\n");
+    println!("command: {command}\nopcode: {opcode}\ntypes_byte: {types:08b}\nkind_byte: {kind_byte:08b}\nparam1: {param1}\nparam2: {param2}\nparam3: {param3}\n\n");
 
     index += 15;
     command += 1;
