@@ -1,10 +1,10 @@
 use std::{fmt::Display, io::stdout};
 
-use crossterm::{
+use robson_compiler::data_struct::IError;
+use robson_compiler::terminal::{
   execute,
   style::{Color, Print, ResetColor, SetForegroundColor},
 };
-use robson_compiler::data_struct::IError;
 
 pub fn color_print<T>(string: T, color: Color)
 where
