@@ -146,7 +146,7 @@ fn write_to_file(
 }
 
 fn main() {
-  const VERSION: &str = "0.1.4";
+  const VERSION: &str = "0.1.5";
   let args = &std::env::args().collect::<Vec<String>>();
   let mut raw_run = true;
   let mut file_path = String::new();

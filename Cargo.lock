@@ -171,8 +171,6 @@ dependencies = [
 [[package]]
 name = "robson_compiler"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b16aa971ff4852d3ae16a905b5dc6af3f2ca427835b8825f3231d5e3f1ca319"
 dependencies = [
  "crossterm",
  "rand",
