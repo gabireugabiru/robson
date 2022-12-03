@@ -9,4 +9,4 @@ edition = "2021"
 lto = true
 debug = 1
 [dependencies]
-robson_compiler = { path = "../robson_compiler" }
+robson_compiler = "0.1.5"
