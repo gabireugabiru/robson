@@ -82,7 +82,7 @@ fn compile_robson(file_path: String) -> Result<Vec<u8>, IError> {
 fn warn_flags(flag: impl Display) {
   color_print(
     format!(
-      "!invalid flag '{flag}', flags are:!\nDebug\nCompile\nDebug\n\nThe execution will continue ignoring it\n\n-----------------"
+      "!invalid flag '{flag}', flags are:!\nRun\nCompile\nDebug\nTime\nPrint\n\nThe execution will continue ignoring it\n\n-----------------"
     ),
     Color::Yellow,
   );
@@ -120,7 +120,6 @@ fn write_to_file(
       .to_str()
       .unwrap()
   );
-  println!("{}", true_path);
 
   let file = File::create(&true_path);
   if let Err(err) = file {
@@ -146,7 +145,7 @@ fn write_to_file(
 }
 
 fn main() {
-  const VERSION: &str = "0.1.5";
+  const VERSION: &str = "0.1.6";
   let args = &std::env::args().collect::<Vec<String>>();
   let mut raw_run = true;
   let mut file_path = String::new();
@@ -262,7 +261,17 @@ fn main() {
           chars.reverse();
           println!("robson robson robson");
           for i in chars {
-            println!("comeu {}", i as u32);
+            let mut bytes = [0, 0, 0, 0];
+            i.encode_utf8(&mut bytes);
+            let mut zeroes = 0;
+            for a in bytes {
+              if a == 0 {
+                zeroes += 1;
+              }
+            }
+
+            let result = u32::from_be_bytes(bytes) >> zeroes * 8;
+            println!("comeu {result}");
           }
           return;
         }
@@ -274,6 +283,20 @@ fn main() {
           if int.is_err() {
             color_print("Something went wrong", Color::Red);
             return;
+          }
+          let mut int = int.unwrap();
+          if let Err(err) = int.run_buffer() {
+            print_err(err);
+          }
+          return;
+        }
+        "--boxes" => {
+          let int = interpreter::Interpreter::new(
+            include_bytes!("out/boxes.rbsn"),
+            RunInfra::new(),
+          );
+          if int.is_err() {
+            color_print("Something went wrong", Color::Red);
           }
           let mut int = int.unwrap();
           if let Err(err) = int.run_buffer() {

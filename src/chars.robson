@@ -84,9 +84,7 @@ lambeu :loop
 
 
 ; SET THE KEY
-robson robson
-fudeu 6
-comeu 10000
+robson robson robson robson robson robson robson robson robson
 lambeu :set_current_key
 
 ; CHECK END

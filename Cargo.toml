@@ -1,6 +1,6 @@
 [package]
 name = "robson"
-version = "0.1.4"
+version = "0.1.6"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,4 +9,4 @@ edition = "2021"
 lto = true
 debug = 1
 [dependencies]
-robson_compiler = "0.1.5"
+robson_compiler = { path = "../robson_compiler" }
